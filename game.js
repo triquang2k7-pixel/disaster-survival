@@ -187,7 +187,7 @@ let isMultiplayer = false;
 let isHost = false;
 let mySlot = 0;
 let myPlayerId = 'p_' + Math.random().toString(36).substring(2, 8);
-let myPlayerName = 'Chiến Binh';
+let myPlayerName = 'Player';
 let currentRoomCode = '';
 let roomPlayers = []; // { id, name, slot, isHost, ready, isAlive, deathCause, x, y, dir, hp, isFrozen, score, time }
 let isSpectator = false;
@@ -253,6 +253,7 @@ function startSoloGame() {
   isMultiplayer = false;
   isHost = true;
   mySlot = 0;
+  myPlayerName = 'Player';
   isSpectator = false;
   if (elMultiHud) elMultiHud.classList.add('hidden');
   if (elModeSubtitle) elModeSubtitle.textContent = 'Chơi Đơn (Solo)';
