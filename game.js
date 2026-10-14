@@ -152,9 +152,19 @@ let electrifiedPuddles = new Set();// "x,y" of shocked water
 let puddleSpreadAcc = 0;
 let thunderTimer = 8000;
 
-// 3. Tornado
+// 3. Tornado (1 to 3 random tornadoes)
+let tornadoes = [];
 let tornado = null;
 let tornadoTimer = 11000;
+
+// Burn & Environmental Damage over Time (DoT)
+let burnDuration = 0;       // Remaining ms of burn effect on player
+let burnTickCooldown = 0;   // Cooldown between fire burn ticks
+let electroTickCooldown = 0;// Cooldown between electrified puddle ticks
+let sinkholeTickCooldown = 0;// Cooldown between sinkhole ticks
+let tornadoTickCooldown = 0;// Cooldown between tornado ticks
+let playerHurtFlash = 0;    // Visual hurt tint without screen shake
+let lawnCanvas = null;      // Cached pre-rendered background canvas
 
 // 4. Landslides (2-4 Dead Zones)
 let landslide = null;
@@ -286,8 +296,16 @@ function startGame() {
   puddleSpreadAcc = 0;
   thunderTimer    = 7000;
 
+  tornadoes       = [];
   tornado         = null;
   tornadoTimer    = 10000;
+
+  burnDuration    = 0;
+  burnTickCooldown = 0;
+  electroTickCooldown = 0;
+  sinkholeTickCooldown = 0;
+  tornadoTickCooldown = 0;
+  playerHurtFlash = 0;
 
   landslide       = null;
   sinkholeCells   = new Set();
@@ -355,6 +373,27 @@ function takeDamage(amount, reason) {
 
   wrapper.classList.add('shake');
   setTimeout(() => wrapper.classList.remove('shake'), 250);
+
+  if (hp <= 0) {
+    handlePlayerDeath(reason);
+  }
+}
+
+// Sát thương rút máu êm theo thời gian (DoT) cho lửa, nước điện, cát lún, lốc xoáy...
+function takeTickDamage(amount, reason, type = 'fire') {
+  if (isSpectator) return;
+
+  hp = Math.max(0, hp - amount);
+  playerHurtFlash = 120;
+  updateHpUI();
+
+  let icon = '🔥';
+  let color = '#f97316';
+  if (type === 'electric') { icon = '⚡'; color = '#38bdf8'; }
+  else if (type === 'tornado') { icon = '🌪️'; color = '#cbd5e1'; }
+  else if (type === 'sinkhole') { icon = '🕳️'; color = '#d97706'; }
+
+  spawnFloatingText(`-${amount} ${icon}`, player.x, player.y, color);
 
   if (hp <= 0) {
     handlePlayerDeath(reason);
@@ -1158,36 +1197,50 @@ function spawnElectricSparks(gx, gy) {
 }
 
 // ══════════════════════════════════════════════
-//  3. LỐC XOÁY (Tornado Disaster 🌪️)
+//  3. LỐC XOÁY (Tornado Disaster 🌪️ - Random 1 to 3)
 // ══════════════════════════════════════════════
 
 function startTornado() {
   const corners = [
-    { x: CELL * 2, y: CELL * 2 },
-    { x: CANVAS_PX - CELL * 2, y: CELL * 2 },
-    { x: CELL * 2, y: CANVAS_PX - CELL * 2 },
-    { x: CANVAS_PX - CELL * 2, y: CANVAS_PX - CELL * 2 }
+    { x: CELL * 3, y: CELL * 3 },
+    { x: CANVAS_PX - CELL * 3, y: CELL * 3 },
+    { x: CELL * 3, y: CANVAS_PX - CELL * 3 },
+    { x: CANVAS_PX - CELL * 3, y: CANVAS_PX - CELL * 3 },
+    { x: CANVAS_PX / 2, y: CELL * 2 },
+    { x: CANVAS_PX / 2, y: CANVAS_PX - CELL * 2 },
   ];
-  const c = corners[Math.floor(Math.random() * corners.length)];
+  // Random từ 1 đến 3 cơn lốc xoáy
+  const count = Math.floor(Math.random() * 3) + 1;
+  tornadoes = [];
+  const shuffled = [...corners].sort(() => Math.random() - 0.5);
 
-  tornado = {
-    x: c.x,
-    y: c.y,
-    vx: (Math.random() - 0.5) * 1.5,
-    vy: (Math.random() - 0.5) * 1.5,
-    state: 'warning',
-    stateTime: 0,
-    angle: 0,
-  };
+  for (let i = 0; i < count; i++) {
+    const c = shuffled[i % shuffled.length];
+    const ox = (Math.random() - 0.5) * CELL * 2;
+    const oy = (Math.random() - 0.5) * CELL * 2;
+    tornadoes.push({
+      id: i,
+      x: Math.max(CELL * 2, Math.min(CANVAS_PX - CELL * 2, c.x + ox)),
+      y: Math.max(CELL * 2, Math.min(CANVAS_PX - CELL * 2, c.y + oy)),
+      vx: (Math.random() - 0.5) * 1.5,
+      vy: (Math.random() - 0.5) * 1.5,
+      state: 'warning',
+      stateTime: 0,
+      angle: Math.random() * Math.PI,
+    });
+  }
+  tornado = tornadoes[0] || null;
 }
 
 function updateTornado(dt) {
   if (isMultiplayer && !isHost) {
-    if (tornado) tornado.angle += dt * 0.015;
+    for (const t of tornadoes) {
+      t.angle += dt * 0.015;
+    }
     return;
   }
 
-  if (!tornado) {
+  if (tornadoes.length === 0) {
     tornadoTimer -= dt;
     if (tornadoTimer <= 0) {
       startTornado();
@@ -1196,77 +1249,94 @@ function updateTornado(dt) {
     return;
   }
 
-  tornado.stateTime += dt;
-  tornado.angle += dt * 0.015;
+  let allDone = true;
+  for (let i = 0; i < tornadoes.length; i++) {
+    const t = tornadoes[i];
+    t.stateTime += dt;
+    t.angle += dt * 0.015;
 
-  if (tornado.state === 'warning') {
-    if (tornado.stateTime >= TORNADO_WARN_TIME) {
-      tornado.state = 'active';
-      tornado.stateTime = 0;
-      wrapper.classList.add('shake');
-      setTimeout(() => wrapper.classList.remove('shake'), 350);
+    if (t.state === 'warning') {
+      allDone = false;
+      if (t.stateTime >= TORNADO_WARN_TIME) {
+        t.state = 'active';
+        t.stateTime = 0;
+        if (i === 0) {
+          wrapper.classList.add('shake');
+          setTimeout(() => wrapper.classList.remove('shake'), 300);
+        }
+      }
+      continue;
     }
-    return;
-  }
 
-  if (tornado.state === 'active') {
-    let targetX = player.x * CELL + CELL / 2;
-    let targetY = player.y * CELL + CELL / 2;
+    if (t.state === 'active') {
+      if (t.stateTime < TORNADO_DURATION) {
+        allDone = false;
+      } else {
+        continue;
+      }
 
-    if (isMultiplayer) {
-      let minDist = 99999;
-      for (const rp of roomPlayers) {
-        if (rp.isAlive) {
-          const rpx = rp.x * CELL + CELL / 2;
-          const rpy = rp.y * CELL + CELL / 2;
-          const d = Math.hypot(rpx - tornado.x, rpy - tornado.y);
-          if (d < minDist) {
-            minDist = d;
-            targetX = rpx;
-            targetY = rpy;
+      // Tracking target (nearest living survivor)
+      let targetX = player.x * CELL + CELL / 2;
+      let targetY = player.y * CELL + CELL / 2;
+
+      if (isMultiplayer) {
+        let minDist = 99999;
+        for (const rp of roomPlayers) {
+          if (rp.isAlive) {
+            const rpx = rp.x * CELL + CELL / 2;
+            const rpy = rp.y * CELL + CELL / 2;
+            const d = Math.hypot(rpx - t.x, rpy - t.y);
+            if (d < minDist) {
+              minDist = d;
+              targetX = rpx;
+              targetY = rpy;
+            }
           }
         }
       }
+
+      const dx = targetX - t.x;
+      const dy = targetY - t.y;
+      const dist = Math.hypot(dx, dy) || 1;
+
+      t.vx += (dx / dist) * 0.035;
+      t.vy += (dy / dist) * 0.035;
+      const speed = Math.hypot(t.vx, t.vy);
+      if (speed > 1.6) {
+        t.vx = (t.vx / speed) * 1.6;
+        t.vy = (t.vy / speed) * 1.6;
+      }
+
+      t.x += t.vx * (dt / 16);
+      t.y += t.vy * (dt / 16);
+
+      if (t.x < CELL) { t.x = CELL; t.vx *= -1; }
+      if (t.x > CANVAS_PX - CELL) { t.x = CANVAS_PX - CELL; t.vx *= -1; }
+      if (t.y < CELL) { t.y = CELL; t.vy *= -1; }
+      if (t.y > CANVAS_PX - CELL) { t.y = CANVAS_PX - CELL; t.vy *= -1; }
+
+      if (Math.random() < 0.25 && particles.length < 80) {
+        const pAngle = Math.random() * Math.PI * 2;
+        const pDist = 8 + Math.random() * 22;
+        particles.push({
+          x: t.x + Math.cos(pAngle) * pDist,
+          y: t.y + Math.sin(pAngle) * pDist,
+          vx: Math.cos(pAngle + Math.PI / 2) * 1.6,
+          vy: Math.sin(pAngle + Math.PI / 2) * 1.6,
+          size: 2 + Math.random() * 2.5,
+          color: Math.random() < 0.5 ? '#cbd5e1' : '#a1a1aa',
+          life: 250,
+          maxLife: 250,
+        });
+      }
     }
+  }
 
-    const dx = targetX - tornado.x;
-    const dy = targetY - tornado.y;
-    const dist = Math.hypot(dx, dy) || 1;
-
-    tornado.vx += (dx / dist) * 0.04;
-    tornado.vy += (dy / dist) * 0.04;
-    const speed = Math.hypot(tornado.vx, tornado.vy);
-    if (speed > 1.8) {
-      tornado.vx = (tornado.vx / speed) * 1.8;
-      tornado.vy = (tornado.vy / speed) * 1.8;
-    }
-
-    tornado.x += tornado.vx * (dt / 16);
-    tornado.y += tornado.vy * (dt / 16);
-
-    if (tornado.x < CELL) { tornado.x = CELL; tornado.vx *= -1; }
-    if (tornado.x > CANVAS_PX - CELL) { tornado.x = CANVAS_PX - CELL; tornado.vx *= -1; }
-    if (tornado.y < CELL) { tornado.y = CELL; tornado.vy *= -1; }
-    if (tornado.y > CANVAS_PX - CELL) { tornado.y = CANVAS_PX - CELL; tornado.vy *= -1; }
-
-    if (Math.random() < 0.4) {
-      const pAngle = Math.random() * Math.PI * 2;
-      const pDist = 10 + Math.random() * 25;
-      particles.push({
-        x: tornado.x + Math.cos(pAngle) * pDist,
-        y: tornado.y + Math.sin(pAngle) * pDist,
-        vx: Math.cos(pAngle + Math.PI / 2) * 2,
-        vy: Math.sin(pAngle + Math.PI / 2) * 2,
-        size: 2 + Math.random() * 3,
-        color: Math.random() < 0.5 ? '#cbd5e1' : '#a1a1aa',
-        life: 300,
-        maxLife: 300,
-      });
-    }
-
-    if (tornado.stateTime >= TORNADO_DURATION) {
-      tornado = null;
-    }
+  if (allDone) {
+    tornadoes = [];
+    tornado = null;
+  } else {
+    tornado = tornadoes[0] || null;
   }
 }
 
@@ -1479,9 +1549,11 @@ function updateWarningBanners() {
     const sec = Math.max(0, (THUNDER_WARN_TIME - thunderstorm.stateTime) / 1000).toFixed(1);
     warnings.push(`⚡ SẤM CHỚP & MƯA DẬP LỬA [${sec}s]`);
   }
-  if (tornado && tornado.state === 'warning') {
-    const sec = Math.max(0, (TORNADO_WARN_TIME - tornado.stateTime) / 1000).toFixed(1);
-    warnings.push(`🌪️ LỐC XOÁY [${sec}s]`);
+  const warnTornado = tornadoes.find(t => t.state === 'warning');
+  if (warnTornado) {
+    const sec = Math.max(0, (TORNADO_WARN_TIME - warnTornado.stateTime) / 1000).toFixed(1);
+    const countText = tornadoes.length > 1 ? ` (${tornadoes.length} CƠN LỐC)` : '';
+    warnings.push(`🌪️ LỐC XOÁY${countText} [${sec}s]`);
   }
   if (landslide && landslide.state === 'warning') {
     const sec = Math.max(0, (LANDSLIDE_WARN_TIME - landslide.stateTime) / 1000).toFixed(1);
@@ -1564,9 +1636,9 @@ function loop(now) {
 
   updateWarningBanners();
 
-  // Check ongoing hazard damage for living player
+  // Check ongoing hazard damage for living player (smooth DoT)
   if (!isSpectator) {
-    checkHazardDamage();
+    checkHazardDamage(dt);
     checkTrapsAndMinesTrigger();
   }
 
@@ -1589,50 +1661,108 @@ function loop(now) {
   draw();
 }
 
-// Check ongoing environmental damage
-function checkHazardDamage() {
+// Check ongoing environmental damage with smooth DoT (Damage over Time)
+function checkHazardDamage(dt) {
+  if (isSpectator) return;
   const key = `${player.x},${player.y}`;
 
-  if (fireCells.has(key)) {
-    takeDamage(35, 'Bị thiêu rụi bởi biển lửa núi lửa!');
-    return;
-  }
-  if (spreadingFlames.has(key)) {
-    takeDamage(30, 'Bị thiêu đốt bởi ngọn lửa lan rộng!');
-    return;
-  }
-  if (lightningCells.has(key)) {
-    takeDamage(60, 'Bị gián đoạn bởi luồng sét cực mạnh!');
-    return;
-  }
-  if (electrifiedPuddles.has(key)) {
-    takeDamage(45, 'Bị sét đánh trúng vũng nước dẫn điện!');
-    return;
-  }
-  if (sinkholeCells.has(key)) {
-    takeDamage(60, 'Rơi xuống hố vực sâu của vụ sụt lở đất!');
-    return;
+  // 1. Dẫm vũng nước sẽ dập tắt lửa ngay lập tức! 💧
+  if (puddleCells.has(key)) {
+    if (burnDuration > 0) {
+      burnDuration = 0;
+      spawnSteam(player.x, player.y);
+      spawnFloatingText('💨 Đã dập tắt lửa!', player.x, player.y, '#38bdf8');
+    }
   }
 
-  // Craters
+  // 2. Núi lửa & Ngọn lửa lan rộng (Bị bén lửa và thiêu đốt máu từ từ)
+  if (fireCells.has(key) || spreadingFlames.has(key)) {
+    burnDuration = Math.max(burnDuration, 2400); // Bén lửa cháy 2.4s
+  }
+
+  // Đất cháy miệng hố bom cũng làm bén lửa
   for (const c of craters) {
     for (const cell of c.cells) {
       if (cell.x === player.x && cell.y === player.y) {
-        takeDamage(35, 'Bị thương nặng trong vùng đất cháy của quả bom!');
-        return;
+        burnDuration = Math.max(burnDuration, 1600);
+        break;
       }
     }
   }
 
-  // Tornado
-  if (tornado && tornado.state === 'active') {
-    const px = player.x * CELL + CELL / 2;
-    const py = player.y * CELL + CELL / 2;
-    const dist = Math.hypot(px - tornado.x, py - tornado.y);
-    if (dist < CELL * 1.5) {
-      takeDamage(35, 'Bị cuốn phăng vào tâm cơn lốc xoáy khổng lồ!');
-      return;
+  // Xử lý rút máu khi đang bị bỏng lửa (mỗi 380ms rút 4 HP, không giật màn hình)
+  if (burnDuration > 0) {
+    burnDuration -= dt;
+    burnTickCooldown -= dt;
+    if (burnTickCooldown <= 0) {
+      burnTickCooldown = 380;
+      takeTickDamage(4, 'Bị thiêu đốt bởi ngọn lửa!', 'fire');
+      if (particles.length < 80) {
+        particles.push({
+          x: player.x * CELL + CELL / 2 + (Math.random() - 0.5) * 8,
+          y: player.y * CELL + CELL / 2,
+          vx: (Math.random() - 0.5) * 0.8,
+          vy: -1.2 - Math.random() * 0.8,
+          size: 2.5,
+          color: Math.random() < 0.5 ? '#f97316' : '#ef4444',
+          life: 220,
+          maxLife: 220,
+        });
+      }
     }
+  }
+
+  // 3. Vũng nước nhiễm điện (Giật điện rút máu theo nhịp mỗi 350ms rút 7 HP)
+  if (electrifiedPuddles.has(key)) {
+    electroTickCooldown -= dt;
+    if (electroTickCooldown <= 0) {
+      electroTickCooldown = 350;
+      takeTickDamage(7, 'Bị giật bởi dòng điện trong nước!', 'electric');
+    }
+  } else {
+    electroTickCooldown = Math.min(electroTickCooldown, 80);
+  }
+
+  // 4. Sụt lở đất / Hố sụt lún (Cát lún rút máu mỗi 400ms rút 7 HP)
+  if (sinkholeCells.has(key)) {
+    sinkholeTickCooldown -= dt;
+    if (sinkholeTickCooldown <= 0) {
+      sinkholeTickCooldown = 400;
+      takeTickDamage(7, 'Bị lún sâu trong hố sụt lở đất!', 'sinkhole');
+    }
+  } else {
+    sinkholeTickCooldown = Math.min(sinkholeTickCooldown, 80);
+  }
+
+  // 5. Luồng sét đánh trực tiếp (Lúc cao trào của sấm chớp)
+  if (lightningCells.has(key)) {
+    electroTickCooldown -= dt;
+    if (electroTickCooldown <= 0) {
+      electroTickCooldown = 300;
+      takeTickDamage(18, 'Bị luồng sét cực mạnh giáng trúng!', 'electric');
+    }
+  }
+
+  // 6. Lốc xoáy (Khi đứng gần tâm lốc xoáy bị hút và cuốn rút máu mỗi 320ms rút 5 HP)
+  const px = player.x * CELL + CELL / 2;
+  const py = player.y * CELL + CELL / 2;
+  let inVortex = false;
+  for (const t of tornadoes) {
+    if (t.state === 'active') {
+      const dist = Math.hypot(px - t.x, py - t.y);
+      if (dist < CELL * 1.6) {
+        inVortex = true;
+        tornadoTickCooldown -= dt;
+        if (tornadoTickCooldown <= 0) {
+          tornadoTickCooldown = 320;
+          takeTickDamage(5, 'Bị cuốn vào tâm cơn lốc xoáy!', 'tornado');
+        }
+        break;
+      }
+    }
+  }
+  if (!inVortex) {
+    tornadoTickCooldown = Math.min(tornadoTickCooldown, 80);
   }
 }
 
@@ -1680,7 +1810,6 @@ function update() {
 
   if (isSpectator) return;
 
-  checkHazardDamage();
   checkTrapsAndMinesTrigger();
 }
 
@@ -1767,74 +1896,79 @@ function draw() {
   if (paused) drawPauseOverlay();
 }
 
-// ── Draw Grass & Charred Burnt Soil ───────────
-function drawGrassLawn() {
+// ── Pre-rendered Grass Lawn & Burnt Soil Cache (Cực mượt) ──
+function initLawnCanvas() {
+  lawnCanvas = document.createElement('canvas');
+  lawnCanvas.width = CANVAS_PX;
+  lawnCanvas.height = CANVAS_PX;
+  const lctx = lawnCanvas.getContext('2d');
+
   const grassLight = '#33832e';
   const grassDark  = '#2a7226';
 
   for (let gx = 0; gx < GRID; gx++) {
     for (let gy = 0; gy < GRID; gy++) {
-      const key = `${gx},${gy}`;
-
-      if (burntGrass.has(key)) {
-        ctx.fillStyle = '#1c130d';
-        ctx.fillRect(gx * CELL, gy * CELL, CELL, CELL);
-
-        ctx.fillStyle = 'rgba(120, 53, 15, 0.4)';
-        ctx.fillRect(gx * CELL + 2, gy * CELL + 2, CELL - 4, CELL - 4);
-
-        if (Math.random() < 0.08) {
-          ctx.fillStyle = '#f97316';
-          ctx.fillRect(gx * CELL + Math.random() * CELL, gy * CELL + Math.random() * CELL, 1.5, 1.5);
-        }
-      } else {
-        ctx.fillStyle = (gx + gy) % 2 === 0 ? grassLight : grassDark;
-        ctx.fillRect(gx * CELL, gy * CELL, CELL, CELL);
-      }
+      lctx.fillStyle = (gx + gy) % 2 === 0 ? grassLight : grassDark;
+      lctx.fillRect(gx * CELL, gy * CELL, CELL, CELL);
     }
   }
 
   for (const dec of lawnDecorations) {
-    const gx = Math.floor(dec.x / CELL);
-    const gy = Math.floor(dec.y / CELL);
-    if (burntGrass.has(`${gx},${gy}`)) continue;
-
     if (dec.type === 'tuft') {
-      ctx.strokeStyle = '#1d541b';
-      ctx.lineWidth = 1.3;
-      ctx.beginPath();
-      ctx.moveTo(dec.x, dec.y + 4);
-      ctx.quadraticCurveTo(dec.x - 2, dec.y, dec.x - 3, dec.y - 4);
-      ctx.moveTo(dec.x, dec.y + 4);
-      ctx.quadraticCurveTo(dec.x + 2, dec.y, dec.x + 3, dec.y - 4);
-      ctx.stroke();
+      lctx.strokeStyle = '#1d541b';
+      lctx.lineWidth = 1.3;
+      lctx.beginPath();
+      lctx.moveTo(dec.x, dec.y + 4);
+      lctx.quadraticCurveTo(dec.x - 2, dec.y, dec.x - 3, dec.y - 4);
+      lctx.moveTo(dec.x, dec.y + 4);
+      lctx.quadraticCurveTo(dec.x + 2, dec.y, dec.x + 3, dec.y - 4);
+      lctx.stroke();
     } else if (dec.type === 'flower') {
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-      ctx.beginPath();
-      ctx.arc(dec.x - 2, dec.y, 2, 0, Math.PI * 2);
-      ctx.arc(dec.x + 2, dec.y, 2, 0, Math.PI * 2);
-      ctx.arc(dec.x, dec.y - 2, 2, 0, Math.PI * 2);
-      ctx.arc(dec.x, dec.y + 2, 2, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = '#facc15';
-      ctx.beginPath();
-      ctx.arc(dec.x, dec.y, 1.6, 0, Math.PI * 2);
-      ctx.fill();
+      lctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+      lctx.beginPath();
+      lctx.arc(dec.x - 2, dec.y, 2, 0, Math.PI * 2);
+      lctx.arc(dec.x + 2, dec.y, 2, 0, Math.PI * 2);
+      lctx.arc(dec.x, dec.y - 2, 2, 0, Math.PI * 2);
+      lctx.arc(dec.x, dec.y + 2, 2, 0, Math.PI * 2);
+      lctx.fill();
+      lctx.fillStyle = '#facc15';
+      lctx.beginPath();
+      lctx.arc(dec.x, dec.y, 1.6, 0, Math.PI * 2);
+      lctx.fill();
     } else if (dec.type === 'clover') {
-      ctx.fillStyle = '#1c5e1a';
-      ctx.beginPath();
-      ctx.arc(dec.x - 1.5, dec.y, 1.8, 0, Math.PI * 2);
-      ctx.arc(dec.x + 1.5, dec.y, 1.8, 0, Math.PI * 2);
-      ctx.arc(dec.x, dec.y - 1.8, 1.8, 0, Math.PI * 2);
-      ctx.fill();
+      lctx.fillStyle = '#1c5e1a';
+      lctx.beginPath();
+      lctx.arc(dec.x - 1.5, dec.y, 1.8, 0, Math.PI * 2);
+      lctx.arc(dec.x + 1.5, dec.y, 1.8, 0, Math.PI * 2);
+      lctx.arc(dec.x, dec.y - 1.8, 1.8, 0, Math.PI * 2);
+      lctx.fill();
     }
   }
 
-  ctx.strokeStyle = 'rgba(20, 60, 20, 0.12)';
-  ctx.lineWidth = 1;
+  lctx.strokeStyle = 'rgba(20, 60, 20, 0.12)';
+  lctx.lineWidth = 1;
   for (let i = 1; i < GRID; i++) {
-    ctx.beginPath(); ctx.moveTo(i * CELL, 0); ctx.lineTo(i * CELL, CANVAS_PX); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(0, i * CELL); ctx.lineTo(CANVAS_PX, i * CELL); ctx.stroke();
+    lctx.beginPath(); lctx.moveTo(i * CELL, 0); lctx.lineTo(i * CELL, CANVAS_PX); lctx.stroke();
+    lctx.beginPath(); lctx.moveTo(0, i * CELL); lctx.lineTo(CANVAS_PX, i * CELL); lctx.stroke();
+  }
+}
+
+function drawGrassLawn() {
+  if (!lawnCanvas) initLawnCanvas();
+  ctx.drawImage(lawnCanvas, 0, 0);
+
+  // Chỉ vẽ những ô đất bị cháy xém (tiết kiệm hàng ngàn lệnh vẽ mỗi giây)
+  if (burntGrass.size === 0) return;
+  for (const [key] of burntGrass.entries()) {
+    const comma = key.indexOf(',');
+    const gx = parseInt(key.slice(0, comma), 10);
+    const gy = parseInt(key.slice(comma + 1), 10);
+
+    ctx.fillStyle = '#1c130d';
+    ctx.fillRect(gx * CELL, gy * CELL, CELL, CELL);
+
+    ctx.fillStyle = 'rgba(120, 53, 15, 0.4)';
+    ctx.fillRect(gx * CELL + 2, gy * CELL + 2, CELL - 4, CELL - 4);
   }
 }
 
@@ -1939,65 +2073,64 @@ function drawSpreadingFlames() {
 
 // ── Draw Tornado (Lốc Xoáy 🌪️) ─────────────────
 function drawTornado() {
-  if (!tornado) return;
+  if (tornadoes.length === 0) return;
   const now = performance.now();
 
-  if (tornado.state === 'warning') {
-    const pulse = 0.4 + Math.sin(now * 0.012) * 0.35;
-    const sec = Math.max(0, (TORNADO_WARN_TIME - tornado.stateTime) / 1000).toFixed(1);
+  for (const t of tornadoes) {
+    if (t.state === 'warning') {
+      const pulse = 0.4 + Math.sin(now * 0.012 + t.id) * 0.35;
+      const sec = Math.max(0, (TORNADO_WARN_TIME - t.stateTime) / 1000).toFixed(1);
 
-    ctx.save();
-    ctx.strokeStyle = `rgba(203, 213, 225, ${0.7 * pulse})`;
-    ctx.lineWidth = 2;
-    ctx.setLineDash([4, 4]);
-    ctx.beginPath();
-    ctx.arc(tornado.x, tornado.y, CELL * 1.6, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.setLineDash([]);
-
-    ctx.fillStyle = `rgba(148, 163, 184, ${0.2 * pulse})`;
-    ctx.fill();
-
-    ctx.shadowColor = '#cbd5e1';
-    ctx.shadowBlur = 12;
-    ctx.font = '24px serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('🌪️', tornado.x, tornado.y + 8);
-
-    ctx.font = '800 11px "JetBrains Mono", monospace';
-    ctx.fillStyle = '#f8fafc';
-    ctx.fillText(sec + 's', tornado.x, tornado.y - 18);
-    ctx.restore();
-    return;
-  }
-
-  if (tornado.state === 'active') {
-    ctx.save();
-    const tAngle = tornado.angle;
-
-    for (let r = 3; r >= 1; r--) {
-      const radius = r * 14;
-      const alpha = 0.25 + (3 - r) * 0.15;
-
-      ctx.strokeStyle = `rgba(226, 232, 240, ${alpha})`;
-      ctx.lineWidth = 3 - r * 0.5;
+      ctx.save();
+      ctx.strokeStyle = `rgba(203, 213, 225, ${0.7 * pulse})`;
+      ctx.lineWidth = 2;
+      ctx.setLineDash([4, 4]);
       ctx.beginPath();
-      ctx.ellipse(tornado.x, tornado.y, radius, radius * 0.65, tAngle * (r % 2 === 0 ? 1 : -1), 0, Math.PI * 2);
+      ctx.arc(t.x, t.y, CELL * 1.6, 0, Math.PI * 2);
       ctx.stroke();
+      ctx.setLineDash([]);
+
+      ctx.fillStyle = `rgba(148, 163, 184, ${0.2 * pulse})`;
+      ctx.fill();
+
+      ctx.shadowColor = '#cbd5e1';
+      ctx.shadowBlur = 12;
+      ctx.font = '24px serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('🌪️', t.x, t.y + 8);
+
+      ctx.font = '800 11px "JetBrains Mono", monospace';
+      ctx.fillStyle = '#f8fafc';
+      ctx.fillText(sec + 's', t.x, t.y - 18);
+      ctx.restore();
+    } else if (t.state === 'active') {
+      ctx.save();
+      const tAngle = t.angle;
+
+      for (let r = 3; r >= 1; r--) {
+        const radius = r * 13;
+        const alpha = 0.22 + (3 - r) * 0.14;
+
+        ctx.strokeStyle = `rgba(226, 232, 240, ${alpha})`;
+        ctx.lineWidth = 3 - r * 0.5;
+        ctx.beginPath();
+        ctx.ellipse(t.x, t.y, radius, radius * 0.65, tAngle * (r % 2 === 0 ? 1 : -1), 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      ctx.fillStyle = 'rgba(71, 85, 105, 0.35)';
+      ctx.beginPath();
+      ctx.arc(t.x, t.y, CELL * 1.3, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.shadowColor = '#94a3b8';
+      ctx.shadowBlur = 12;
+      ctx.font = '26px serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('🌪️', t.x, t.y + 9);
+
+      ctx.restore();
     }
-
-    ctx.fillStyle = 'rgba(71, 85, 105, 0.4)';
-    ctx.beginPath();
-    ctx.arc(tornado.x, tornado.y, CELL * 1.4, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.shadowColor = '#94a3b8';
-    ctx.shadowBlur = 15;
-    ctx.font = '28px serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('🌪️', tornado.x, tornado.y + 10);
-
-    ctx.restore();
   }
 }
 
@@ -2241,6 +2374,12 @@ function drawSingleSurvivor(p, pDir, slot, name, currentHp, isFrozen, isHit, isD
   ctx.shadowColor = 'rgba(0,0,0,0.8)';
   ctx.shadowBlur = 4;
   ctx.fillText(name, cx, cy - 22);
+
+  // Hiệu ứng đang bị cháy (bén lửa): hiện ngọn lửa nhỏ trên đầu nhắc người chơi chạy ra vũng nước!
+  if (slot === mySlot && burnDuration > 0 && !isDead) {
+    ctx.font = '13px serif';
+    ctx.fillText('🔥', cx, cy - 32);
+  }
 
   ctx.restore();
 }
@@ -2631,13 +2770,21 @@ function drawCraters() {
 }
 
 function drawParticles() {
-  for (const p of particles) {
-    const ratio = p.life / p.maxLife;
+  if (particles.length === 0) return;
+  if (particles.length > 80) {
+    particles.splice(0, particles.length - 80);
+  }
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.life -= 16;
+    if (p.life <= 0) {
+      particles.splice(i, 1);
+      continue;
+    }
+    const ratio = Math.max(0, p.life / p.maxLife);
     ctx.globalAlpha = ratio;
     ctx.fillStyle = p.color;
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, p.size * ratio, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.fillRect(p.x - p.size / 2, p.y - p.size / 2, Math.max(1, p.size * ratio), Math.max(1, p.size * ratio));
     p.x += p.vx;
     p.y += p.vy;
   }
@@ -3172,6 +3319,7 @@ function broadcastDisasterSync() {
     puddleCells: Array.from(puddleCells),
     electrifiedPuddles: Array.from(electrifiedPuddles),
     tornado: tornado ? { x: tornado.x, y: tornado.y, vx: tornado.vx, vy: tornado.vy, state: tornado.state, angle: tornado.angle } : null,
+    tornadoes: tornadoes.map(t => ({ id: t.id, x: t.x, y: t.y, vx: t.vx, vy: t.vy, state: t.state, stateTime: t.stateTime, angle: t.angle })),
     landslide: landslide ? { state: landslide.state, zones: landslide.zones } : null,
     sinkholeCells: Array.from(sinkholeCells),
     bombs: bombs,
@@ -3206,7 +3354,13 @@ function applyDisasterSync(sync) {
   if (sync.puddleCells) puddleCells = new Set(sync.puddleCells);
   if (sync.electrifiedPuddles) electrifiedPuddles = new Set(sync.electrifiedPuddles);
 
-  if (sync.tornado !== undefined) tornado = sync.tornado;
+  if (sync.tornadoes !== undefined) {
+    tornadoes = sync.tornadoes;
+    tornado = tornadoes[0] || null;
+  } else if (sync.tornado !== undefined) {
+    tornado = sync.tornado;
+    tornadoes = sync.tornado ? [sync.tornado] : [];
+  }
   if (sync.landslide !== undefined) landslide = sync.landslide;
   if (sync.sinkholeCells) sinkholeCells = new Set(sync.sinkholeCells);
   if (sync.bombs) bombs = sync.bombs;
