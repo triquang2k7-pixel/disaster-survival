@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>🏃‍♂️ Thoát Khỏi Thiên Tai — Disaster Survival</title>
+  <meta name="description" content="Game sinh tồn chạy trốn thiên tai: Núi lửa, bão sấm chớp nhiễm điện vũng nước, sụt lở đất và nhặt vật phẩm.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&family=JetBrains+Mono:wght@500;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+</head>
+<body>
+  <div class="game-container" id="gameContainer">
+    <!-- Background firefly & dust particles -->
+    <div class="bg-particles" id="bgParticles"></div>
+
+    <!-- Header -->
+    <header class="game-header">
+      <div class="logo">
+        <span class="logo-icon">🏃‍♂️</span>
+        <div class="logo-group">
+          <span class="logo-text">Thoát Thiên Tai</span>
+          <span class="logo-sub" id="modeSubtitle">Disaster Escape</span>
+        </div>
+      </div>
+      <div class="score-panel">
+        <div class="score-item">
+          <span class="score-label">Điểm số</span>
+          <span class="score-value" id="score">0</span>
+        </div>
+        <div class="score-divider"></div>
+        <div class="score-item">
+          <span class="score-label">Thời gian</span>
+          <span class="score-value time" id="timeDisplay">0.0s</span>
+        </div>
+        <div class="score-divider"></div>
+        <div class="score-item">
+          <span class="score-label">Kỷ lục điểm</span>
+          <span class="score-value best" id="bestScore">0</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Multiplayer In-Game Player Status HUD (Hidden in Solo) -->
+    <div class="multi-hud hidden" id="multiHud">
+      <!-- 4 player status badges generated dynamically -->
+      <div class="multi-player-badge p0" id="mpBadge0">
+        <span class="mp-icon">🏃</span>
+        <span class="mp-name">P1</span>
+        <span class="mp-score">0đ</span>
+      </div>
+      <div class="multi-player-badge p1" id="mpBadge1">
+        <span class="mp-icon">🏃</span>
+        <span class="mp-name">P2</span>
+        <span class="mp-score">0đ</span>
+      </div>
+      <div class="multi-player-badge p2" id="mpBadge2">
+        <span class="mp-icon">🏃</span>
+        <span class="mp-name">P3</span>
+        <span class="mp-score">0đ</span>
+      </div>
+      <div class="multi-player-badge p3" id="mpBadge3">
+        <span class="mp-icon">🏃</span>
+        <span class="mp-name">P4</span>
+        <span class="mp-score">0đ</span>
+      </div>
+    </div>
+
+    <!-- Player Status Bar: 100 HP & Inventory (Slots 1 & 2) -->
+    <div class="player-hud" id="playerHud">
+      <!-- Health Bar -->
+      <div class="hp-box">
+        <span class="hp-icon">❤️</span>
+        <div class="hp-bar-bg">
+          <div class="hp-fill" id="hpFill" style="width: 100%;"></div>
+        </div>
+        <span class="hp-text" id="hpText">100/100 HP</span>
+      </div>
+
+      <!-- Inventory: Trap (1) & Landmine (2) -->
+      <div class="inventory-bar">
+        <button class="inv-slot" id="slotTrap" onclick="deployTrap()" title="Nhấn phím 1 để thả Bẫy kẹp">
+          <span class="slot-key">1</span>
+          <span class="slot-icon">🪤</span>
+          <span class="slot-count" id="countTrap">x1</span>
+        </button>
+        <button class="inv-slot" id="slotMine" onclick="deployMine()" title="Nhấn phím 2 để thả Mìn tàng hình">
+          <span class="slot-key">2</span>
+          <span class="slot-icon">💣</span>
+          <span class="slot-count" id="countMine">x1</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Event Toast Alert (Landmine drop, Trap trigger, etc.) -->
+    <div class="event-toast hidden" id="eventToast">
+      <span class="toast-text" id="toastText"></span>
+    </div>
+
+    <!-- Game canvas wrapper -->
+    <div class="canvas-wrapper" id="canvasWrapper">
+      <canvas id="gameCanvas"></canvas>
+
+      <!-- Hazard warning banner -->
+      <div class="hazard-warning hidden" id="hazardWarning">
+        <span class="hazard-warn-text" id="hazardWarnText"></span>
+      </div>
+
+      <!-- Overlay: Start -->
+      <div class="overlay" id="overlayStart">
+        <div class="overlay-content">
+          <div class="overlay-icon">🏃‍♂️</div>
+          <h1 class="overlay-title">Thoát Khỏi Thiên Tai</h1>
+          <p class="overlay-sub">Sinh tồn 100 HP: Lốc xoáy, núi lửa đốt cỏ lan rộng, sấm chớp nhiễm điện vũng nước! Nhặt tim ❤️ hồi máu, thả Bẫy 🪤 làm bất động và Mìn tàng hình 💣 nổ lan!</p>
+          <div class="hazard-info">
+            <span class="hazard-tag heart">❤️ Tim hồi máu (5-10 HP)</span>
+            <span class="hazard-tag trap">🪤 Bẫy bất động (Phím 1)</span>
+            <span class="hazard-tag landmine">💣 Mìn tàng hình (Phím 2)</span>
+            <span class="hazard-tag tornado">🌪️ Lốc xoáy</span>
+            <span class="hazard-tag fire">🔥 Lửa lan rộng</span>
+            <span class="hazard-tag thunder">⚡ Sấm chớp & Nước</span>
+            <span class="hazard-tag landslide">🕳️ Sụt lở đất</span>
+          </div>
+
+          <!-- Mode Select Buttons -->
+          <div class="start-actions">
+            <button class="btn-play primary" id="btnStart" onclick="startSoloGame()">
+              <span>▶</span> Chơi Đơn (Solo)
+            </button>
+            <button class="btn-play secondary" id="btnOpenOnline" onclick="openOnlineModal()">
+              <span>🌐</span> Chơi Online (4 Người)
+            </button>
+          </div>
+
+          <div class="difficulty-picker">
+            <span class="diff-label">Tốc độ chạy:</span>
+            <button class="diff-btn active" data-speed="slow" onclick="setSpeed('slow')">Vừa phải</button>
+            <button class="diff-btn" data-speed="normal" onclick="setSpeed('normal')">Nhanh</button>
+            <button class="diff-btn" data-speed="fast" onclick="setSpeed('fast')">Siêu tốc</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Overlay: Online Multiplayer Modal -->
+      <div class="overlay hidden" id="overlayOnline">
+        <div class="overlay-content online-content">
+          <!-- View 1: Online Mode Setup (Tạo / Vào phòng) -->
+          <div class="online-view" id="viewOnlineMenu">
+            <div class="overlay-icon">🌐</div>
+            <h2 class="overlay-title">Chơi Online 4 Người</h2>
+            <p class="overlay-sub">Sinh tồn cùng bạn bè qua mã phòng. Người sống sót cuối cùng chiến thắng!</p>
+
+            <div class="online-form">
+              <label class="form-label" for="onlinePlayerName">Tên của bạn:</label>
+              <input type="text" id="onlinePlayerName" class="form-input" maxlength="12" placeholder="Nhập tên của bạn..." value="Chiến Binh">
+
+              <div class="online-buttons-grid">
+                <button class="btn-online host" onclick="createOnlineRoom()">
+                  <span>👑</span> Tạo phòng mới (Host)
+                </button>
+              </div>
+
+              <div class="join-divider"><span>HOẶC NHẬP MÃ PHÒNG</span></div>
+
+              <div class="join-row">
+                <input type="text" id="inputRoomCode" class="form-input code-input" maxlength="6" placeholder="Mã phòng..." uppercase>
+                <button class="btn-online join" onclick="joinOnlineRoom()">
+                  <span>🔑</span> Vào phòng
+                </button>
+              </div>
+
+              <p class="online-error-msg hidden" id="onlineError"></p>
+
+              <button class="btn-back" onclick="closeOnlineModal()">
+                <span>⬅</span> Quay lại trang chủ
+              </button>
+            </div>
+          </div>
+
+          <!-- View 2: Room Lobby (Phòng chờ 4 người) -->
+          <div class="online-view hidden" id="viewOnlineLobby">
+            <div class="lobby-header">
+              <div class="room-code-badge">
+                <span class="rc-label">MÃ PHÒNG:</span>
+                <span class="rc-code" id="displayRoomCode">----</span>
+                <button class="btn-copy" id="btnCopyCode" onclick="copyRoomCode()" title="Sao chép mã phòng">📋 Copy</button>
+              </div>
+              <span class="player-count" id="displayPlayerCount">1/4 người chơi</span>
+            </div>
+
+            <!-- 4 Player Slots Cards -->
+            <div class="player-slots-grid" id="playerSlotsContainer">
+              <!-- Rendered via JS -->
+            </div>
+
+            <div class="lobby-actions">
+              <button class="btn-play primary hidden" id="btnStartMultiGame" onclick="hostStartMatch()">
+                <span>🚀</span> Bắt đầu trận đấu
+              </button>
+              <div class="guest-waiting-msg hidden" id="guestWaitingMsg">
+                <span>⏳ Đang chờ Host bắt đầu trận đấu...</span>
+              </div>
+              <button class="btn-back" onclick="leaveOnlineRoom()">
+                <span>🚪</span> Rời phòng
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Overlay: Game Over (Solo) -->
+      <div class="overlay hidden" id="overlayGameOver">
+        <div class="overlay-content">
+          <div class="overlay-icon gameover">💀</div>
+          <h1 class="overlay-title">Bị Thiên Tai Nuốt Chửng!</h1>
+          <p class="overlay-sub">Điểm sinh tồn: <strong id="finalScore">0</strong> điểm (<span id="finalTime">0.0s</span>)</p>
+          <p class="overlay-reason" id="deathReason">Bạn đã bị thiên tai đánh bại!</p>
+          <p class="overlay-record hidden" id="newRecord">🏆 Kỷ lục điểm mới!</p>
+          <button class="btn-play" onclick="startSoloGame()">
+            <span>🔄</span> Chạy lại lần nữa
+          </button>
+        </div>
+      </div>
+
+      <!-- Overlay: Multiplayer Match Results -->
+      <div class="overlay hidden" id="overlayMultiGameOver">
+        <div class="overlay-content">
+          <div class="overlay-icon">🏆</div>
+          <h1 class="overlay-title">Trận Đấu Kết Thúc!</h1>
+          <p class="overlay-sub">Bảng xếp hạng sinh tồn phòng <strong id="resRoomCode">----</strong></p>
+
+          <div class="leaderboard-table" id="leaderboardList">
+            <!-- Dynamically populated rank cards -->
+          </div>
+
+          <div class="multi-go-actions">
+            <button class="btn-play primary hidden" id="btnHostPlayAgain" onclick="hostRestartMatch()">
+              <span>🔄</span> Chơi ván mới
+            </button>
+            <button class="btn-back" onclick="returnToLobby()">
+              <span>🏠</span> Về sảnh phòng
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mobile controls -->
+    <div class="mobile-controls" id="mobileControls">
+      <div class="ctrl-row actions-row">
+        <button class="ctrl-btn-action trap" onclick="deployTrap()">🪤 Bẫy (1)</button>
+        <button class="ctrl-btn-action mine" onclick="deployMine()">💣 Mìn (2)</button>
+      </div>
+      <div class="ctrl-row">
+        <button class="ctrl-btn" onclick="changeDir('up')">▲</button>
+      </div>
+      <div class="ctrl-row">
+        <button class="ctrl-btn" onclick="changeDir('left')">◀</button>
+        <button class="ctrl-btn" onclick="changeDir('down')">▼</button>
+        <button class="ctrl-btn" onclick="changeDir('right')">▶</button>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="game-footer">
+      <span><kbd>WASD</kbd> di chuyển · <kbd>1</kbd> Thả Bẫy · <kbd>2</kbd> Thả Mìn · <kbd>Space</kbd> tạm dừng</span>
+      <span class="pause-indicator hidden" id="pauseIndicator">⏸ Đã tạm dừng</span>
+    </footer>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>
