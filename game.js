@@ -80,11 +80,17 @@ const elOverStart   = document.getElementById('overlayStart');
 const elOverGO      = document.getElementById('overlayGameOver');
 const elOverOnline  = document.getElementById('overlayOnline');
 const elOverMultiGO = document.getElementById('overlayMultiGameOver');
+const elOverCountdown = document.getElementById('overlayCountdown');
+const elCountdownNum  = document.getElementById('countdownNum');
+const elCountdownSub  = document.getElementById('countdownSub');
 const elPause       = document.getElementById('pauseIndicator');
 const wrapper       = document.getElementById('canvasWrapper');
 const elWarn        = document.getElementById('hazardWarning');
 const elWarnText    = document.getElementById('hazardWarnText');
 const elMultiHud    = document.getElementById('multiHud');
+
+let isCountingDown   = false;
+let countdownTimerId = null;
 
 // HP & Inventory DOM refs
 const elHpFill      = document.getElementById('hpFill');
@@ -256,8 +262,10 @@ function startSoloGame() {
 function startGame() {
   const spawn = isMultiplayer ? INITIAL_SPAWNS[mySlot % 4] : { x: 10, y: 10 };
   player  = { x: spawn.x, y: spawn.y };
-  dir     = { x: 0, y: 0 };
-  nextDir = { x: 0, y: 0 };
+  // Hướng chạy ban đầu (không đứng yên để tránh bất tử)
+  const initDir = (spawn.x < GRID / 2) ? { x: 1, y: 0 } : { x: -1, y: 0 };
+  dir     = { ...initDir };
+  nextDir = { ...initDir };
   survivalTime = 0;
   bonusScore = 0;
   paused  = false;
@@ -317,6 +325,13 @@ function startGame() {
 
   hideWarning();
 
+  if (countdownTimerId) {
+    clearInterval(countdownTimerId);
+    countdownTimerId = null;
+  }
+  isCountingDown = false;
+  if (elOverCountdown) elOverCountdown.classList.add('hidden');
+
   elScore.textContent = '0';
   if (elTimeDisplay) elTimeDisplay.textContent = '0.0s';
   elOverStart.classList.add('hidden');
@@ -343,6 +358,59 @@ function startGame() {
   lastTime = performance.now();
   if (loopId) cancelAnimationFrame(loopId);
   loopId = requestAnimationFrame(loop);
+
+  // Bắt đầu đếm ngược 3 2 1
+  startCountdown();
+}
+
+// ── Đếm ngược 3 2 1 trước khi bắt đầu trận đấu ────
+function startCountdown(onComplete) {
+  if (countdownTimerId) clearInterval(countdownTimerId);
+  isCountingDown = true;
+  let count = 3;
+
+  if (elOverCountdown && elCountdownNum && elCountdownSub) {
+    elOverCountdown.classList.remove('hidden');
+    elCountdownNum.classList.remove('go');
+    elCountdownNum.textContent = '3';
+    elCountdownSub.textContent = 'CHUẨN BỊ CHẠY!';
+    elCountdownNum.style.animation = 'none';
+    void elCountdownNum.offsetWidth;
+    elCountdownNum.style.animation = '';
+  }
+
+  countdownTimerId = setInterval(() => {
+    count--;
+    if (!elOverCountdown) return;
+
+    if (count === 2) {
+      elCountdownNum.textContent = '2';
+      elCountdownSub.textContent = 'SẴN SÀNG...';
+      elCountdownNum.style.animation = 'none';
+      void elCountdownNum.offsetWidth;
+      elCountdownNum.style.animation = '';
+    } else if (count === 1) {
+      elCountdownNum.textContent = '1';
+      elCountdownSub.textContent = 'XUẤT PHÁT!';
+      elCountdownNum.style.animation = 'none';
+      void elCountdownNum.offsetWidth;
+      elCountdownNum.style.animation = '';
+    } else if (count === 0) {
+      elCountdownNum.textContent = 'BẮT ĐẦU! 🏃‍♂️';
+      elCountdownNum.classList.add('go');
+      elCountdownSub.textContent = 'CHẠY THOÁT THIÊN TAI!';
+      elCountdownNum.style.animation = 'none';
+      void elCountdownNum.offsetWidth;
+      elCountdownNum.style.animation = '';
+    } else {
+      clearInterval(countdownTimerId);
+      countdownTimerId = null;
+      elOverCountdown.classList.add('hidden');
+      isCountingDown = false;
+      lastTime = performance.now();
+      if (onComplete) onComplete();
+    }
+  }, 850);
 }
 
 // ── HP & Damage Management ────────────────────
@@ -1584,6 +1652,12 @@ function loop(now) {
   lastTime = now;
 
   if (!running || paused) {
+    draw();
+    return;
+  }
+
+  // Trong thời gian đếm ngược 3 2 1: Chỉ vẽ khung cảnh, chưa kích hoạt di chuyển hay thiên tai!
+  if (isCountingDown) {
     draw();
     return;
   }
@@ -3099,6 +3173,12 @@ function hostRestartMatch() {
 
 function returnToLobby() {
   running = false;
+  if (countdownTimerId) {
+    clearInterval(countdownTimerId);
+    countdownTimerId = null;
+  }
+  isCountingDown = false;
+  if (elOverCountdown) elOverCountdown.classList.add('hidden');
   if (loopId) cancelAnimationFrame(loopId);
   elOverMultiGO.classList.add('hidden');
   elOverOnline.classList.remove('hidden');
