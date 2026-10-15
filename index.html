@@ -3,11 +3,11 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>🏃‍♂️ Thoát Khỏi Thiên Tai — Disaster Survival</title>
-  <meta name="description" content="Game sinh tồn chạy trốn thiên tai: Núi lửa, bão sấm chớp nhiễm điện vũng nước, sụt lở đất và nhặt vật phẩm.">
+  <title>Thoát Khỏi Thiên Tai — Disaster Survival</title>
+  <meta name="description" content="Game sinh tồn chạy trốn thiên tai đa hiểm họa: Núi lửa phun trào, bão giông sấm chớp, lốc xoáy tản rộng, bom nổ phân tán, sụt lở đất.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;800;900&family=Inter:wght@400;600;700;800;900&family=JetBrains+Mono:wght@500;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;800;900&family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
   <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 </head>
@@ -21,7 +21,19 @@
     <!-- Header -->
     <header class="game-header">
       <div class="logo">
-        <span class="logo-icon">🏃‍♂️</span>
+        <div class="logo-icon-wrap">
+          <svg class="logo-svg" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="logoGrad" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
+                <stop stop-color="#00e5ff"/>
+                <stop offset="0.5" stop-color="#7c4dff"/>
+                <stop offset="1" stop-color="#00e676"/>
+              </linearGradient>
+            </defs>
+            <path d="M16 2L4 7v9c0 8.5 5.5 13.5 12 15 6.5-1.5 12-6.5 12-15V7L16 2z" stroke="url(#logoGrad)" stroke-width="2.2" fill="rgba(0,229,255,0.06)"/>
+            <path d="M14 9l-3 6h4l-2 8 8-10h-4.5l2.5-4h-5z" fill="url(#logoGrad)"/>
+          </svg>
+        </div>
         <div class="logo-group">
           <span class="logo-text">Thoát Thiên Tai</span>
           <span class="logo-sub" id="modeSubtitle">Disaster Escape</span>
@@ -53,22 +65,30 @@
     <!-- Multiplayer In-Game Player Status HUD (Hidden in Solo) -->
     <div class="multi-hud hidden" id="multiHud">
       <div class="multi-player-badge p0" id="mpBadge0">
-        <span class="mp-icon">🏃</span>
+        <span class="mp-icon">
+          <svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor"><circle cx="8" cy="4" r="3"/><path d="M2 14c0-3.3 2.7-6 6-6s6 2.7 6 6z"/></svg>
+        </span>
         <span class="mp-name">P1</span>
         <span class="mp-score">0đ</span>
       </div>
       <div class="multi-player-badge p1" id="mpBadge1">
-        <span class="mp-icon">🏃</span>
+        <span class="mp-icon">
+          <svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor"><circle cx="8" cy="4" r="3"/><path d="M2 14c0-3.3 2.7-6 6-6s6 2.7 6 6z"/></svg>
+        </span>
         <span class="mp-name">P2</span>
         <span class="mp-score">0đ</span>
       </div>
       <div class="multi-player-badge p2" id="mpBadge2">
-        <span class="mp-icon">🏃</span>
+        <span class="mp-icon">
+          <svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor"><circle cx="8" cy="4" r="3"/><path d="M2 14c0-3.3 2.7-6 6-6s6 2.7 6 6z"/></svg>
+        </span>
         <span class="mp-name">P3</span>
         <span class="mp-score">0đ</span>
       </div>
       <div class="multi-player-badge p3" id="mpBadge3">
-        <span class="mp-icon">🏃</span>
+        <span class="mp-icon">
+          <svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor"><circle cx="8" cy="4" r="3"/><path d="M2 14c0-3.3 2.7-6 6-6s6 2.7 6 6z"/></svg>
+        </span>
         <span class="mp-name">P4</span>
         <span class="mp-score">0đ</span>
       </div>
@@ -78,7 +98,12 @@
     <div class="player-hud" id="playerHud">
       <!-- Health Bar -->
       <div class="hp-box">
-        <span class="hp-icon">❤️</span>
+        <span class="hp-icon">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#ff1744" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" fill="rgba(255,23,68,0.2)"/>
+            <path d="M7 11h2.5l1.5-3 2 6 1.5-3H17" stroke="#fff" stroke-width="1.8"/>
+          </svg>
+        </span>
         <div class="hp-bar-bg">
           <div class="hp-fill" id="hpFill" style="width: 100%;"></div>
         </div>
@@ -89,23 +114,39 @@
       <div class="inventory-bar">
         <button class="inv-slot" id="slotTrap" onclick="deployTrap()" title="Nhấn phím 1 để thả Bẫy kẹp">
           <span class="slot-key">1</span>
-          <span class="slot-icon">🪤</span>
+          <span class="slot-icon">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#ffea00" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M4 19h16M6 19V9l6 7 6-7v10"/>
+              <circle cx="12" cy="15" r="1.5" fill="#ffea00"/>
+            </svg>
+          </span>
           <span class="slot-count" id="countTrap">x1</span>
         </button>
         <button class="inv-slot" id="slotMine" onclick="deployMine()" title="Nhấn phím 2 để thả Mìn tàng hình">
           <span class="slot-key">2</span>
-          <span class="slot-icon">💣</span>
+          <span class="slot-icon">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#ff5252" stroke-width="2" stroke-linecap="round">
+              <rect x="3" y="11" width="18" height="7" rx="3.5" fill="rgba(255,82,82,0.25)"/>
+              <circle cx="12" cy="6" r="2" fill="#ff1744"/>
+              <line x1="12" y1="8" x2="12" y2="11"/>
+            </svg>
+          </span>
           <span class="slot-count" id="countMine">x1</span>
         </button>
-        <button class="inv-slot gun-slot" id="slotGun" onclick="shootGun()" title="Nhấn phím 3 hoặc click để bắn (hướng đang nhìn)">
+        <button class="inv-slot gun-slot" id="slotGun" onclick="shootGun()" title="Nhấn phím 3, F hoặc click để bắn">
           <span class="slot-key">3</span>
-          <span class="slot-icon">🔫</span>
+          <span class="slot-icon">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#ff9100" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 11h11l3-3h3v5h-2l-1 2h-4v4h-3v-4H3z" fill="rgba(255,145,0,0.2)"/>
+              <circle cx="18" cy="10" r="1" fill="#fff"/>
+            </svg>
+          </span>
           <span class="slot-count" id="countGun">x0</span>
         </button>
       </div>
     </div>
 
-    <!-- Event Toast Alert (Landmine drop, Trap trigger, etc.) -->
+    <!-- Event Toast Alert -->
     <div class="event-toast hidden" id="eventToast">
       <span class="toast-text" id="toastText"></span>
     </div>
@@ -123,31 +164,64 @@
       <div class="overlay" id="overlayStart">
         <div class="overlay-content start-screen">
           <div class="start-hero">
-            <div class="overlay-icon">🏃‍♂️</div>
+            <div class="overlay-hero-badge">
+              <svg viewBox="0 0 48 48" width="56" height="56" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="24" cy="24" r="22" stroke="url(#logoGrad)" stroke-width="2.5" fill="rgba(10,22,40,0.7)"/>
+                <path d="M24 7L10 13v12c0 10.5 6 16.5 14 18 8-1.5 14-7.5 14-18V13L24 7z" stroke="#00e5ff" stroke-width="2" fill="rgba(0,229,255,0.12)"/>
+                <path d="M22 15l-4 7h5l-2 9 10-12h-5.5l3-4h-6.5z" fill="url(#logoGrad)"/>
+              </svg>
+            </div>
             <h1 class="overlay-title">Thoát Khỏi Thiên Tai</h1>
-            <p class="overlay-sub">Sinh tồn 100 HP: Lốc xoáy, núi lửa đốt cỏ lan rộng, sấm chớp nhiễm điện vũng nước!<br>Nhặt ❤️ hồi máu, 🔫 bắn người chơi khác, thả Bẫy 🪤 và Mìn 💣!</p>
+            <p class="overlay-sub">Di chuyển mượt mà tự do 360°, sinh tồn 100 HP né tránh thiên tai tàn khốc:<br>Lốc xoáy tự tản rộng, bom nổ phân tán ngẫu nhiên, núi lửa kèm mưa bão sấm chớp!</p>
           </div>
           <div class="hazard-info">
-            <span class="hazard-tag heart">❤️ Tim hồi máu</span>
-            <span class="hazard-tag gun-tag">🔫 Súng (1 đạn, tích được)</span>
-            <span class="hazard-tag trap">🪤 Bẫy (Chỉ Online)</span>
-            <span class="hazard-tag landmine">💣 Mìn (Chỉ Online)</span>
-            <span class="hazard-tag tornado">🌪️ Lốc xoáy</span>
-            <span class="hazard-tag fire">🔥 Lửa lan rộng</span>
-            <span class="hazard-tag thunder">⚡ Sấm chớp & Nước</span>
-            <span class="hazard-tag landslide">🕳️ Sụt lở đất</span>
+            <span class="hazard-tag heart">
+              <svg viewBox="0 0 16 16" width="12" height="12" fill="#ff1744"><path d="M8 14.5l-1-0.9C3.6 10.4 1.3 8.3 1.3 5.7 1.3 3.6 2.9 2 5 2c1.2 0 2.3.6 3 1.5C8.7 2.6 9.8 2 11 2c2.1 0 3.7 1.6 3.7 3.7 0 2.6-2.3 4.7-5.7 7.9L8 14.5z"/></svg>
+              Hồi Sinh Lực
+            </span>
+            <span class="hazard-tag gun-tag">
+              <svg viewBox="0 0 16 16" width="12" height="12" fill="#ff9100"><path d="M2 7h7l2-2h3v4h-1.5l-1 1.5H6V14H4V9H2z"/></svg>
+              Súng Plasma (Tích đạn)
+            </span>
+            <span class="hazard-tag trap">
+              <svg viewBox="0 0 16 16" width="12" height="12" fill="#ffea00"><path d="M2 13h12M4 13V6l4 5 4-5v7"/></svg>
+              Bẫy Kẹp (Online)
+            </span>
+            <span class="hazard-tag landmine">
+              <svg viewBox="0 0 16 16" width="12" height="12" fill="#ff5252"><rect x="2" y="8" width="12" height="5" rx="2.5"/><circle cx="8" cy="5" r="1.5"/></svg>
+              Mìn Tàng Hình (Online)
+            </span>
+            <span class="hazard-tag tornado">
+              <svg viewBox="0 0 16 16" width="12" height="12" fill="#cfd8dc"><path d="M2 3h12M4 6h8M5 9h6M7 12h2M7.5 14h1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+              Lốc Xoáy Tản Đều
+            </span>
+            <span class="hazard-tag fire">
+              <svg viewBox="0 0 16 16" width="12" height="12" fill="#ff6e40"><path d="M8 1c.5 3-2 4-2 7 0 2.5 1.8 4 4 4s4-1.8 4-4.5C14 4 10 3 8 1z"/></svg>
+              Núi Lửa & Lửa Lan
+            </span>
+            <span class="hazard-tag thunder">
+              <svg viewBox="0 0 16 16" width="12" height="12" fill="#40c4ff"><path d="M9 1L3 9h5l-1 6 7-8H9z"/></svg>
+              Mưa Giông Sấm Sét
+            </span>
+            <span class="hazard-tag landslide">
+              <svg viewBox="0 0 16 16" width="12" height="12" fill="#ffab40"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.8" fill="none"/><path d="M5 8l2 2 4-4" stroke="currentColor" stroke-width="1.5"/></svg>
+              Sụt Lở Địa Chấn
+            </span>
           </div>
 
           <!-- Mode Select Buttons -->
           <div class="start-actions">
             <button class="btn-play primary glow-btn" id="btnStart" onclick="startSoloGame()">
-              <span>▶</span> Chơi Đơn (Solo)
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><polygon points="6,3 20,12 6,21"/></svg>
+              <span>Chơi Đơn (Solo)</span>
             </button>
             <button class="btn-play secondary glow-btn" id="btnOpenOnline" onclick="openOnlineModal()">
-              <span>🌐</span> Chơi Online (4 Người)
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 010 18M12 3a14 14 0 000 18"/></svg>
+              <span>Chơi Online (4 Người)</span>
             </button>
             <button class="btn-play skin-btn glow-btn" id="btnOpenSkinShop" onclick="openSkinShop()">
-              <span>🎨</span> Cửa Hàng Skin
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3z"/><path d="M12 8v8M8 10l4 2 4-2"/></svg>
+              <span>Cửa Hàng Skin</span>
             </button>
           </div>
 
@@ -164,10 +238,16 @@
       <div class="overlay hidden" id="overlaySkinShop">
         <div class="overlay-content skin-shop-content">
           <div class="skin-shop-header">
-            <h2 class="overlay-title">🎨 Cửa Hàng Skin</h2>
+            <h2 class="overlay-title">Cửa Hàng Skin</h2>
             <p class="overlay-sub">Chọn trang phục cho nhân vật của bạn! Kiếm xu bằng cách sinh tồn.</p>
             <div class="shop-coins-bar">
-              <span class="shop-coin-icon">🪙</span>
+              <span class="shop-coin-icon">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#ffb300" stroke-width="2">
+                  <circle cx="12" cy="12" r="9" fill="rgba(255,179,0,0.2)"/>
+                  <circle cx="12" cy="12" r="5" stroke-dasharray="2 2"/>
+                  <path d="M10 9h3a1.5 1.5 0 010 3h-2a1.5 1.5 0 000 3h3M12 7v2M12 15v2" stroke="#fff" stroke-linecap="round"/>
+                </svg>
+              </span>
               <span class="shop-coin-value" id="shopCoinDisplay">0</span>
               <span class="shop-coin-label">Xu</span>
             </div>
@@ -176,7 +256,8 @@
             <!-- Generated via JS -->
           </div>
           <button class="btn-back glow-btn" onclick="closeSkinShop()">
-            <span>⬅</span> Quay lại
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+            <span>Quay lại</span>
           </button>
         </div>
       </div>
@@ -186,7 +267,12 @@
         <div class="overlay-content online-content">
           <!-- View 1: Online Mode Setup (Tạo / Vào phòng) -->
           <div class="online-view" id="viewOnlineMenu">
-            <div class="overlay-icon">🌐</div>
+            <div class="overlay-hero-badge">
+              <svg viewBox="0 0 24 24" width="44" height="44" fill="none" stroke="#00e5ff" stroke-width="1.8">
+                <circle cx="12" cy="12" r="9"/>
+                <path d="M3 12h18M12 3a14 14 0 010 18M12 3a14 14 0 000 18"/>
+              </svg>
+            </div>
             <h2 class="overlay-title">Chơi Online 4 Người</h2>
             <p class="overlay-sub">Sinh tồn cùng bạn bè qua mã phòng. Người sống sót cuối cùng chiến thắng!</p>
 
@@ -196,23 +282,26 @@
 
               <div class="online-buttons-grid">
                 <button class="btn-online host glow-btn" onclick="createOnlineRoom()">
-                  <span>👑</span> Tạo phòng mới (Host)
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M3 18h18l-3-11-4 4-2-6-2 6-4-4z"/></svg>
+                  <span>Tạo phòng mới (Host)</span>
                 </button>
               </div>
 
               <div class="join-divider"><span>HOẶC NHẬP MÃ PHÒNG</span></div>
 
               <div class="join-row">
-                <input type="text" id="inputRoomCode" class="form-input code-input" maxlength="6" placeholder="Mã phòng..." uppercase>
+                <input type="text" id="inputRoomCode" class="form-input code-input" maxlength="6" placeholder="MÃ PHÒNG..." uppercase>
                 <button class="btn-online join glow-btn" onclick="joinOnlineRoom()">
-                  <span>🔑</span> Vào phòng
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="8" cy="12" r="4"/><path d="M12 12h8v3h-3v2h-2"/></svg>
+                  <span>Vào phòng</span>
                 </button>
               </div>
 
               <p class="online-error-msg hidden" id="onlineError"></p>
 
               <button class="btn-back" onclick="closeOnlineModal()">
-                <span>⬅</span> Quay lại trang chủ
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+                <span>Quay lại trang chủ</span>
               </button>
             </div>
           </div>
@@ -223,7 +312,10 @@
               <div class="room-code-badge">
                 <span class="rc-label">MÃ PHÒNG:</span>
                 <span class="rc-code" id="displayRoomCode">----</span>
-                <button class="btn-copy" id="btnCopyCode" onclick="copyRoomCode()" title="Sao chép mã phòng">📋 Copy</button>
+                <button class="btn-copy" id="btnCopyCode" onclick="copyRoomCode()" title="Sao chép mã phòng">
+                  <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+                  <span>Copy</span>
+                </button>
               </div>
               <span class="player-count" id="displayPlayerCount">1/4 người chơi</span>
             </div>
@@ -235,13 +327,15 @@
 
             <div class="lobby-actions">
               <button class="btn-play primary glow-btn hidden" id="btnStartMultiGame" onclick="hostStartMatch()">
-                <span>🚀</span> Bắt đầu trận đấu
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M4.5 16.5c-1.5 1.5-.5 4.5-.5 4.5s3 1 4.5-.5l11-11c1-1 1-3 0-4s-3-1-4 0z"/><path d="M14 6l4 4"/></svg>
+                <span>Bắt đầu trận đấu</span>
               </button>
               <div class="guest-waiting-msg hidden" id="guestWaitingMsg">
-                <span>⏳ Đang chờ Host bắt đầu trận đấu...</span>
+                <span>Đang chờ Host bắt đầu trận đấu...</span>
               </div>
               <button class="btn-back" onclick="leaveOnlineRoom()">
-                <span>🚪</span> Rời phòng
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+                <span>Rời phòng</span>
               </button>
             </div>
           </div>
@@ -252,14 +346,21 @@
       <div class="overlay hidden countdown-overlay" id="overlayCountdown">
         <div class="countdown-box">
           <div class="countdown-num" id="countdownNum">3</div>
-          <div class="countdown-sub" id="countdownSub">CHUẨN BỊ CHẠY!</div>
+          <div class="countdown-sub" id="countdownSub">CHUẨN BỊ XUẤT PHÁT!</div>
         </div>
       </div>
 
       <!-- Overlay: Game Over (Solo) -->
       <div class="overlay hidden" id="overlayGameOver">
         <div class="overlay-content gameover-screen">
-          <div class="overlay-icon gameover">💀</div>
+          <div class="overlay-hero-badge gameover">
+            <svg viewBox="0 0 48 48" width="56" height="56" fill="none" stroke="#ff1744" stroke-width="2">
+              <circle cx="24" cy="24" r="21" fill="rgba(255,23,68,0.12)"/>
+              <path d="M16 18c0-4.4 3.6-8 8-8s8 3.6 8 8v4c0 2-1 4-2 5l1 5h-4l-1-2h-4l-1 2h-4l1-5c-1-1-2-3-2-5v-4z" fill="rgba(255,23,68,0.25)"/>
+              <circle cx="20" cy="18" r="2.2" fill="#ff1744"/>
+              <circle cx="28" cy="18" r="2.2" fill="#ff1744"/>
+            </svg>
+          </div>
           <h1 class="overlay-title gameover-title">Bị Thiên Tai Nuốt Chửng!</h1>
           <div class="gameover-stats">
             <div class="go-stat">
@@ -276,9 +377,10 @@
             </div>
           </div>
           <p class="overlay-reason" id="deathReason">Bạn đã bị thiên tai đánh bại!</p>
-          <p class="overlay-record hidden" id="newRecord">🏆 Kỷ lục điểm mới!</p>
+          <p class="overlay-record hidden" id="newRecord">Kỷ lục điểm mới!</p>
           <button class="btn-play glow-btn" onclick="startSoloGame()">
-            <span>🔄</span> Chạy lại lần nữa
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+            <span>Chạy lại lần nữa</span>
           </button>
         </div>
       </div>
@@ -286,7 +388,12 @@
       <!-- Overlay: Multiplayer Match Results -->
       <div class="overlay hidden" id="overlayMultiGameOver">
         <div class="overlay-content">
-          <div class="overlay-icon">🏆</div>
+          <div class="overlay-hero-badge">
+            <svg viewBox="0 0 48 48" width="56" height="56" fill="none" stroke="#ffea00" stroke-width="2">
+              <path d="M12 12h24v10c0 6.6-5.4 12-12 12s-12-5.4-12-12V12z" fill="rgba(255,234,0,0.2)"/>
+              <path d="M12 16H6a4 4 0 00-4 4v2a6 6 0 006 6h4M36 16h6a4 4 0 014 4v2a6 6 0 01-6 6h-4M24 34v6M16 40h16"/>
+            </svg>
+          </div>
           <h1 class="overlay-title">Trận Đấu Kết Thúc!</h1>
           <p class="overlay-sub">Bảng xếp hạng sinh tồn phòng <strong id="resRoomCode">----</strong></p>
 
@@ -296,10 +403,12 @@
 
           <div class="multi-go-actions">
             <button class="btn-play primary glow-btn hidden" id="btnHostPlayAgain" onclick="hostRestartMatch()">
-              <span>🔄</span> Chơi ván mới
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+              <span>Chơi ván mới</span>
             </button>
             <button class="btn-back" onclick="returnToLobby()">
-              <span>🏠</span> Về sảnh phòng
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+              <span>Về sảnh phòng</span>
             </button>
           </div>
         </div>
@@ -309,24 +418,41 @@
     <!-- Mobile controls -->
     <div class="mobile-controls" id="mobileControls">
       <div class="ctrl-row actions-row">
-        <button class="ctrl-btn-action trap" onclick="deployTrap()">🪤 Bẫy (1)</button>
-        <button class="ctrl-btn-action mine" onclick="deployMine()">💣 Mìn (2)</button>
-        <button class="ctrl-btn-action gun-mobile" onclick="shootGun()">🔫 Bắn (3)</button>
+        <button class="ctrl-btn-action trap" onclick="deployTrap()">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#ffea00" stroke-width="2"><path d="M4 19h16M6 19V9l6 7 6-7v10"/></svg>
+          Bẫy (1)
+        </button>
+        <button class="ctrl-btn-action mine" onclick="deployMine()">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#ff5252" stroke-width="2"><rect x="3" y="11" width="18" height="7" rx="3.5"/><circle cx="12" cy="6" r="2"/></svg>
+          Mìn (2)
+        </button>
+        <button class="ctrl-btn-action gun-mobile" onclick="shootGun()">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#ff9100" stroke-width="2"><path d="M3 11h11l3-3h3v5h-2l-1 2h-4v4h-3v-4H3z"/></svg>
+          Bắn (3)
+        </button>
       </div>
       <div class="ctrl-row">
-        <button class="ctrl-btn" onclick="changeDir('up')">▲</button>
+        <button class="ctrl-btn" onclick="changeDir('up')">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><polygon points="12,5 4,17 20,17"/></svg>
+        </button>
       </div>
       <div class="ctrl-row">
-        <button class="ctrl-btn" onclick="changeDir('left')">◀</button>
-        <button class="ctrl-btn" onclick="changeDir('down')">▼</button>
-        <button class="ctrl-btn" onclick="changeDir('right')">▶</button>
+        <button class="ctrl-btn" onclick="changeDir('left')">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><polygon points="5,12 17,4 17,20"/></svg>
+        </button>
+        <button class="ctrl-btn" onclick="changeDir('down')">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><polygon points="12,19 4,7 20,7"/></svg>
+        </button>
+        <button class="ctrl-btn" onclick="changeDir('right')">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><polygon points="19,12 7,4 7,20"/></svg>
+        </button>
       </div>
     </div>
 
     <!-- Footer -->
     <footer class="game-footer">
-      <span><kbd>WASD</kbd> di chuyển · <kbd>3</kbd>/<kbd>F</kbd>/Click Bắn súng 🔫 · <kbd>1</kbd>/<kbd>2</kbd> Bẫy & Mìn (Online) · <kbd>Space</kbd> tạm dừng</span>
-      <span class="pause-indicator hidden" id="pauseIndicator">⏸ Đã tạm dừng</span>
+      <span><kbd>WASD</kbd> hoặc <kbd>Mũi tên</kbd> di chuyển mượt · <kbd>3</kbd>/<kbd>F</kbd>/Click Bắn súng · <kbd>1</kbd>/<kbd>2</kbd> Bẫy & Mìn (Online) · <kbd>Space</kbd> tạm dừng</span>
+      <span class="pause-indicator hidden" id="pauseIndicator">ĐÃ TẠM DỪNG</span>
     </footer>
   </div>
 

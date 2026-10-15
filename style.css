@@ -96,7 +96,20 @@ body {
   width: 100%; padding: 0 4px;
 }
 .logo {
-  display: flex; align-items: center; gap: 10px;
+  display: flex; align-items: center; gap: 12px;
+}
+.logo-icon-wrap {
+  width: 40px; height: 40px;
+  display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(135deg, rgba(10, 22, 40, .9), rgba(21, 32, 64, .9));
+  border: 1.5px solid rgba(0, 229, 255, .35);
+  border-radius: 12px;
+  box-shadow: 0 0 16px rgba(0, 229, 255, .3), inset 0 1px 0 rgba(255,255,255,.1);
+  animation: runnerBob 2s ease-in-out infinite alternate;
+}
+.logo-svg {
+  width: 26px; height: 26px;
+  filter: drop-shadow(0 0 6px var(--neon-primary));
 }
 .logo-icon {
   font-size: 30px;
@@ -104,8 +117,8 @@ body {
   animation: runnerBob 1s ease-in-out infinite alternate;
 }
 @keyframes runnerBob {
-  from { transform: translateY(-3px); }
-  to   { transform: translateY(3px); }
+  from { transform: translateY(-2px); }
+  to   { transform: translateY(2px); }
 }
 .logo-group { display: flex; flex-direction: column; gap: 2px; }
 .logo-text {
@@ -412,18 +425,25 @@ canvas {
 .overlay-content::-webkit-scrollbar { width: 4px; }
 .overlay-content::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
 
-.overlay-icon {
+.overlay-icon,
+.overlay-hero-badge {
+  display: flex; align-items: center; justify-content: center;
   font-size: 52px;
-  animation: iconPulse 2s ease-in-out infinite;
-  filter: drop-shadow(0 0 20px rgba(0, 229, 255, .5));
+  animation: iconPulse 2.5s ease-in-out infinite;
+  filter: drop-shadow(0 0 20px rgba(0, 229, 255, .6));
+  margin-bottom: 4px;
 }
 @keyframes iconPulse {
   0%, 100% { transform: scale(1) rotate(0); }
-  25%      { transform: scale(1.08) rotate(-2deg); }
-  50%      { transform: scale(1.15) rotate(0); }
-  75%      { transform: scale(1.08) rotate(2deg); }
+  25%      { transform: scale(1.06) rotate(-2deg); }
+  50%      { transform: scale(1.12) rotate(0); }
+  75%      { transform: scale(1.06) rotate(2deg); }
 }
-.overlay-icon.gameover { animation: iconShake .5s ease; }
+.overlay-icon.gameover,
+.overlay-hero-badge.gameover {
+  animation: iconShake .5s ease;
+  filter: drop-shadow(0 0 24px rgba(255, 23, 68, .8));
+}
 @keyframes iconShake {
   0%, 100% { transform: translateX(0); }
   20%      { transform: translateX(-10px) rotate(-8deg); }
@@ -482,10 +502,10 @@ canvas {
 
 /* ── Buttons ──────────────────────────────────── */
 .btn-play {
-  display: flex; align-items: center; gap: 8px;
-  padding: 14px 28px; border: none; border-radius: 14px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 13px 24px; border: none; border-radius: 14px;
   background: linear-gradient(135deg, #00c853, #00e676);
-  color: #fff; font: 800 14px/1 'Inter', system-ui;
+  color: #fff; font: 800 13px/1 'Inter', system-ui;
   cursor: pointer;
   box-shadow: 0 6px 24px var(--green-glow);
   transition: all .2s cubic-bezier(.4,0,.2,1);
@@ -494,6 +514,13 @@ canvas {
   overflow: hidden;
   text-transform: uppercase;
   letter-spacing: .5px;
+}
+.btn-play svg, .btn-online svg, .btn-back svg, .btn-copy svg {
+  flex-shrink: 0;
+  transition: transform .2s ease;
+}
+.btn-play:hover svg, .btn-online:hover svg, .btn-back:hover svg {
+  transform: scale(1.12);
 }
 .btn-play::before {
   content: '';
@@ -592,11 +619,19 @@ canvas {
   margin-top: 2px;
 }
 .hazard-tag {
-  display: inline-flex; align-items: center; gap: 4px;
-  padding: 4px 10px; border-radius: 8px;
-  font: 600 10px/1.2 'Inter', system-ui;
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 11px; border-radius: 9px;
+  font: 700 10.5px/1.2 'Inter', system-ui;
   letter-spacing: .3px;
-  backdrop-filter: blur(4px);
+  backdrop-filter: blur(6px);
+  transition: transform .2s ease, box-shadow .2s ease;
+}
+.hazard-tag:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,.3);
+}
+.hazard-tag svg {
+  flex-shrink: 0;
 }
 .hazard-tag.heart {
   background: rgba(255, 23, 68, .12);

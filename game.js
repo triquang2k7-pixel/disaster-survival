@@ -60,18 +60,18 @@ const GUN_BULLET_MAX_RANGE = CANVAS_PX; // max travel distance
 // ══════════════════════════════════════════════
 
 const SKIN_CATALOG = [
-  { id: 'default',   name: 'Chiến Binh',     price: 0,   jacket: '#ea580c', cap: '#0284c7', glow: '#fb923c', emoji: '🏃' },
-  { id: 'ninja',     name: 'Ninja Bóng Đêm', price: 100, jacket: '#1e293b', cap: '#334155', glow: '#475569', emoji: '🥷' },
-  { id: 'fire',      name: 'Chiến Binh Lửa', price: 150, jacket: '#dc2626', cap: '#f59e0b', glow: '#ef4444', emoji: '🔥' },
-  { id: 'ice',       name: 'Băng Giá',       price: 150, jacket: '#0284c7', cap: '#7dd3fc', glow: '#38bdf8', emoji: '❄️' },
-  { id: 'toxic',     name: 'Độc Tố Xanh',    price: 200, jacket: '#15803d', cap: '#84cc16', glow: '#4ade80', emoji: '☠️' },
-  { id: 'royal',     name: 'Hoàng Gia',       price: 250, jacket: '#7c3aed', cap: '#fbbf24', glow: '#a78bfa', emoji: '👑' },
-  { id: 'cyber',     name: 'Chiến Binh Cyber',price: 300, jacket: '#06b6d4', cap: '#d946ef', glow: '#22d3ee', emoji: '🤖' },
-  { id: 'shadow',    name: 'Bóng Ma',         price: 350, jacket: '#18181b', cap: '#52525b', glow: '#71717a', emoji: '👻' },
-  { id: 'golden',    name: 'Vàng Ròng',       price: 500, jacket: '#d97706', cap: '#fbbf24', glow: '#f59e0b', emoji: '⭐' },
-  { id: 'rainbow',   name: 'Cầu Vồng',       price: 800, jacket: '#ec4899', cap: '#8b5cf6', glow: '#f472b6', emoji: '🌈' },
-  { id: 'dragon',    name: 'Rồng Thần',       price: 1000,jacket: '#b91c1c', cap: '#fbbf24', glow: '#dc2626', emoji: '🐉' },
-  { id: 'diamond',   name: 'Kim Cương',       price: 1500,jacket: '#0ea5e9', cap: '#e0f2fe', glow: '#38bdf8', emoji: '💎' },
+  { id: 'default',   name: 'Chiến Binh',     price: 0,   jacket: '#ea580c', cap: '#0284c7', glow: '#fb923c' },
+  { id: 'ninja',     name: 'Ninja Bóng Đêm', price: 100, jacket: '#1e293b', cap: '#334155', glow: '#475569' },
+  { id: 'fire',      name: 'Chiến Binh Lửa', price: 150, jacket: '#dc2626', cap: '#f59e0b', glow: '#ef4444' },
+  { id: 'ice',       name: 'Băng Giá',       price: 150, jacket: '#0284c7', cap: '#7dd3fc', glow: '#38bdf8' },
+  { id: 'toxic',     name: 'Độc Tố Xanh',    price: 200, jacket: '#15803d', cap: '#84cc16', glow: '#4ade80' },
+  { id: 'royal',     name: 'Hoàng Gia',       price: 250, jacket: '#7c3aed', cap: '#fbbf24', glow: '#a78bfa' },
+  { id: 'cyber',     name: 'Chiến Binh Cyber',price: 300, jacket: '#06b6d4', cap: '#d946ef', glow: '#22d3ee' },
+  { id: 'shadow',    name: 'Bóng Ma',         price: 350, jacket: '#18181b', cap: '#52525b', glow: '#71717a' },
+  { id: 'golden',    name: 'Vàng Ròng',       price: 500, jacket: '#d97706', cap: '#fbbf24', glow: '#f59e0b' },
+  { id: 'rainbow',   name: 'Cầu Vồng',       price: 800, jacket: '#ec4899', cap: '#8b5cf6', glow: '#f472b6' },
+  { id: 'dragon',    name: 'Rồng Thần',       price: 1000,jacket: '#b91c1c', cap: '#fbbf24', glow: '#dc2626' },
+  { id: 'diamond',   name: 'Kim Cương',       price: 1500,jacket: '#0ea5e9', cap: '#e0f2fe', glow: '#38bdf8' },
 ];
 
 // 4 Player Appearance (multiplayer fallback skins)
@@ -223,6 +223,10 @@ let thunderTimer = 8000;
 let tornadoes = [];
 let tornado = null;
 let tornadoTimer = 11000;
+let tornadoConvergenceTimer = 0;
+let isTornadoConverging = false;
+let mpMoveSyncTimer = 0;
+const keysDown = new Set();
 
 let burnDuration = 0;
 let burnTickCooldown = 0;
@@ -350,21 +354,21 @@ function renderSkinShop() {
 
     const nameEl = document.createElement('div');
     nameEl.className = 'skin-name';
-    nameEl.textContent = `${skin.emoji} ${skin.name}`;
+    nameEl.textContent = skin.name;
 
     const priceEl = document.createElement('div');
     if (isEquipped) {
       priceEl.className = 'skin-price equipped-label';
-      priceEl.textContent = '✓ Đang dùng';
+      priceEl.textContent = 'Đang dùng';
     } else if (isOwned) {
       priceEl.className = 'skin-price owned-label';
-      priceEl.textContent = '✓ Đã sở hữu';
+      priceEl.textContent = 'Đã sở hữu';
     } else if (skin.price === 0) {
       priceEl.className = 'skin-price free';
       priceEl.textContent = 'Miễn phí';
     } else {
       priceEl.className = `skin-price buy`;
-      priceEl.innerHTML = `🪙 ${skin.price} Xu`;
+      priceEl.innerHTML = `<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="#ffb300" stroke-width="2" style="vertical-align:middle;margin-right:3px"><circle cx="12" cy="12" r="9" fill="rgba(255,179,0,0.2)"/><circle cx="12" cy="12" r="5"/></svg>${skin.price} Xu`;
     }
 
     card.appendChild(previewDiv);
@@ -441,7 +445,7 @@ function handleSkinClick(skinId) {
     renderSkinShop();
     lawnCanvas = null;
   } else {
-    showToast(`❌ Không đủ xu! Cần ${skin.price} xu (bạn có ${playerCoins})`);
+    showToast(`Không đủ xu! Cần ${skin.price} xu (bạn có ${playerCoins})`);
   }
 }
 
@@ -463,10 +467,14 @@ function startSoloGame() {
 
 function startGame() {
   const spawn = isMultiplayer ? INITIAL_SPAWNS[mySlot % 4] : { x: 10, y: 10 };
-  player  = { x: spawn.x, y: spawn.y };
   const initDir = (spawn.x < GRID / 2) ? { x: 1, y: 0 } : { x: -1, y: 0 };
+  player  = { x: spawn.x, y: spawn.y, angle: Math.atan2(initDir.y, initDir.x), runDist: 0 };
   dir     = { ...initDir };
   nextDir = { ...initDir };
+  keysDown.clear();
+  tornadoConvergenceTimer = 0;
+  isTornadoConverging = false;
+  mpMoveSyncTimer = 0;
   survivalTime = 0;
   bonusScore = 0;
   roundCoins = 0;
@@ -608,7 +616,7 @@ function startCountdown(onComplete) {
       void elCountdownNum.offsetWidth;
       elCountdownNum.style.animation = '';
     } else if (count === 0) {
-      elCountdownNum.textContent = 'BẮT ĐẦU! 🏃‍♂️';
+      elCountdownNum.textContent = 'BẮT ĐẦU!';
       elCountdownNum.classList.add('go');
       elCountdownSub.textContent = 'CHẠY THOÁT THIÊN TAI!';
       elCountdownNum.style.animation = 'none';
@@ -676,13 +684,13 @@ function takeTickDamage(amount, reason, type = 'fire') {
   playerHurtFlash = 120;
   updateHpUI();
 
-  let icon = '🔥';
+  let label = 'LỬA';
   let color = '#ff6e40';
-  if (type === 'electric') { icon = '⚡'; color = '#40c4ff'; }
-  else if (type === 'tornado') { icon = '🌪️'; color = '#cfd8dc'; }
-  else if (type === 'sinkhole') { icon = '🕳️'; color = '#ffab40'; }
+  if (type === 'electric') { label = 'SẤM SÉT'; color = '#40c4ff'; }
+  else if (type === 'tornado') { label = 'LỐC XOÁY'; color = '#cfd8dc'; }
+  else if (type === 'sinkhole') { label = 'SỤT ĐẤT'; color = '#ffab40'; }
 
-  spawnFloatingText(`-${amount} ${icon}`, player.x, player.y, color);
+  spawnFloatingText(`-${amount} HP [${label}]`, player.x, player.y, color);
 
   if (hp <= 0) {
     handlePlayerDeath(reason);
@@ -695,7 +703,7 @@ function healHp(amount) {
   hp = Math.min(MAX_HP, hp + amount);
   const actual = hp - prev;
   updateHpUI();
-  spawnFloatingText(`+${actual} HP ❤️`, player.x, player.y, '#00e676');
+  spawnFloatingText(`+${actual} HP`, player.x, player.y, '#00e676');
 }
 
 function spawnDamageParticles(gx, gy) {
@@ -770,7 +778,7 @@ function shootGun(targetX, targetY) {
   if (isSpectator || trapFrozenTimer > 0 || !running || paused) return;
 
   if (gunAmmo <= 0) {
-    showToast('🔫 Bạn chưa có đạn! Hãy nhặt súng 🔫 trên bản đồ.');
+    showToast('Bạn chưa có đạn! Hãy nhặt súng Plasma trên bản đồ.');
     return;
   }
 
@@ -804,7 +812,7 @@ function shootGun(targetX, targetY) {
     trail: [],
   });
 
-  spawnFloatingText('💥 BẮN!', player.x, player.y, '#ffab40');
+  spawnFloatingText('BẮN!', player.x, player.y, '#ffab40');
 
   // Screen flash effect
   wrapper.classList.add('shake');
@@ -855,14 +863,14 @@ function updateBullets(dt) {
       if (spreadingFlames.has(cellKey)) {
         spreadingFlames.delete(cellKey);
         spawnSteam(bulletGx, bulletGy);
-        spawnFloatingText('💨 DẬP LỬA', bulletGx, bulletGy, '#38bdf8');
+        spawnFloatingText('DẬP LỬA', bulletGx, bulletGy, '#38bdf8');
         bullets.splice(i, 1);
         break;
       }
       if (fireCells.has(cellKey)) {
         fireCells.delete(cellKey);
         spawnSteam(bulletGx, bulletGy);
-        spawnFloatingText('💨 DẬP LỬA', bulletGx, bulletGy, '#38bdf8');
+        spawnFloatingText('DẬP LỬA', bulletGx, bulletGy, '#38bdf8');
         bullets.splice(i, 1);
         break;
       }
@@ -874,12 +882,12 @@ function updateBullets(dt) {
 
           if (rp.x === bulletGx && rp.y === bulletGy) {
             spawnExplosionParticles(bulletGx, bulletGy);
-            spawnFloatingText('🔫 TRÚNG!', bulletGx, bulletGy, '#ff1744');
+            spawnFloatingText('TRÚNG ĐÍCH!', bulletGx, bulletGy, '#ff1744');
             bullets.splice(i, 1);
 
             // Only the bullet shooter's client sends the hit event to avoid duplicate damage
             if (b.ownerSlot === mySlot) {
-              showToast(`🎯 Bạn bắn trúng ${rp.name}! (-${GUN_BULLET_DAMAGE} HP)`);
+              showToast(`Bạn bắn trúng ${rp.name}! (-${GUN_BULLET_DAMAGE} HP)`);
               broadcastNetworkMessage({
                 type: 'BULLET_HIT',
                 victimSlot: rp.slot,
@@ -932,7 +940,7 @@ function drawBullets() {
 function deployTrap() {
   // Solo mode: no traps
   if (!isMultiplayer) {
-    showToast('🪤 Chế độ chơi đơn không có bẫy!');
+    showToast('Chế độ chơi đơn không có bẫy!');
     return;
   }
   if (trapCount <= 0 || isSpectator || trapFrozenTimer > 0) return;
@@ -941,15 +949,15 @@ function deployTrap() {
 
   const trap = {
     id: 'trap_' + Math.random().toString(36).substring(2, 8),
-    x: player.x,
-    y: player.y,
+    x: Math.round(player.x),
+    y: Math.round(player.y),
     ownerSlot: mySlot,
     ownerName: myPlayerName,
     armTimer: 1800,
     steppedOff: false,
   };
   placedTraps.push(trap);
-  spawnFloatingText('ĐÃ ĐẶT BẪY 🪤', player.x, player.y, '#ffea00');
+  spawnFloatingText('ĐÃ ĐẶT BẪY', player.x, player.y, '#ffea00');
 
   if (isMultiplayer) {
     broadcastNetworkMessage({
@@ -962,7 +970,7 @@ function deployTrap() {
 function deployMine() {
   // Solo mode: no mines
   if (!isMultiplayer) {
-    showToast('💣 Chế độ chơi đơn không có mìn!');
+    showToast('Chế độ chơi đơn không có mìn!');
     return;
   }
   if (mineCount <= 0 || isSpectator || trapFrozenTimer > 0) return;
@@ -971,8 +979,8 @@ function deployMine() {
 
   const mine = {
     id: 'mine_' + Math.random().toString(36).substring(2, 8),
-    x: player.x,
-    y: player.y,
+    x: Math.round(player.x),
+    y: Math.round(player.y),
     ownerSlot: mySlot,
     ownerName: myPlayerName,
     armTimer: 1800,
@@ -981,10 +989,10 @@ function deployMine() {
   placedMines.push(mine);
 
   const alertText = isMultiplayer
-    ? `🚨 ${myPlayerName} vừa gài một quả Mìn Tàng Hình!`
-    : `🚨 Bạn vừa gài Mìn Tàng Hình! Cẩn thận dẫm phải!`;
+    ? `${myPlayerName} vừa gài một quả Mìn Tàng Hình!`
+    : `Bạn vừa gài Mìn Tàng Hình! Cẩn thận dẫm phải!`;
   showToast(alertText);
-  spawnFloatingText('GÀI MÌN 💣 (ẨN)', player.x, player.y, '#ff5252');
+  spawnFloatingText('GÀI MÌN (ẨN)', player.x, player.y, '#ff5252');
 
   if (isMultiplayer) {
     broadcastNetworkMessage({
@@ -1005,11 +1013,11 @@ function checkTrapsAndMinesTrigger() {
     if (isOwner && (!t.steppedOff || t.armTimer > 0)) continue;
     if (!isOwner && t.armTimer > 1400) continue;
 
-    if (t.x === player.x && t.y === player.y) {
+    if (Math.hypot(player.x - t.x, player.y - t.y) < 0.65) {
       trapFrozenTimer = 3000;
       takeDamage(15, 'Bị dính bẫy sắt và tử nạn!');
-      showToast('🪤 BẠN BỊ DÍNH BẪY! Bất động 3 giây!');
-      spawnFloatingText('BỊ KẸP CHÂN 🪤', player.x, player.y, '#ffea00');
+      showToast('BẠN BỊ DÍNH BẪY! Bất động 3 giây!');
+      spawnFloatingText('BỊ KẸP CHÂN', player.x, player.y, '#ffea00');
       placedTraps.splice(i, 1);
 
       if (isMultiplayer) {
@@ -1030,7 +1038,7 @@ function checkTrapsAndMinesTrigger() {
     if (isOwner && (!m.steppedOff || m.armTimer > 0)) continue;
     if (!isOwner && m.armTimer > 1400) continue;
 
-    if (m.x === player.x && m.y === player.y) {
+    if (Math.hypot(player.x - m.x, player.y - m.y) < 0.65) {
       explodeLandmine(m);
       placedMines.splice(i, 1);
 
@@ -1061,7 +1069,7 @@ function explodeLandmine(mine) {
 
   if (Math.hypot(px - mx, py - my) <= blastRadius + 0.3) {
     takeDamage(50, 'Bị nổ tung bởi quả mìn tàng hình!');
-    showToast('💥 MÌN PHÁT NỔ LAN! Mất 50 HP!');
+    showToast('MÌN PHÁT NỔ LAN! Mất 50 HP!');
   }
 
   const cells = [];
@@ -1117,7 +1125,7 @@ function updateItems(dt) {
   if (isMultiplayer && !isHost) {
     for (const it of items) {
       it.pulse = (it.pulse || 0) + dt * 0.005;
-      if (!isSpectator && it.x === player.x && it.y === player.y) {
+      if (!isSpectator && Math.hypot(player.x - it.x, player.y - it.y) < 0.75) {
         collectItem(it);
       }
     }
@@ -1135,7 +1143,7 @@ function updateItems(dt) {
     it.pulse = (it.pulse || 0) + dt * 0.005;
     it.life -= dt;
 
-    if (!isSpectator && it.x === player.x && it.y === player.y) {
+    if (!isSpectator && Math.hypot(player.x - it.x, player.y - it.y) < 0.75) {
       collectItem(it);
       items.splice(i, 1);
       continue;
@@ -1144,7 +1152,7 @@ function updateItems(dt) {
     if (isMultiplayer) {
       let taken = false;
       for (const rp of roomPlayers) {
-        if (rp.slot !== mySlot && rp.isAlive && rp.x === it.x && rp.y === it.y) {
+        if (rp.slot !== mySlot && rp.isAlive && Math.hypot((rp.x || 0) - it.x, (rp.y || 0) - it.y) < 0.75) {
           taken = true;
           break;
         }
@@ -1171,28 +1179,28 @@ function collectItem(it) {
   } else if (it.type === 'trap') {
     trapCount = Math.min(3, trapCount + 1);
     updateInventoryUI();
-    spawnFloatingText('+1 BẪY 🪤', it.x, it.y, '#ffea00');
+    spawnFloatingText('+1 BẪY', it.x, it.y, '#ffea00');
     spawnPickupParticles(it.x, it.y, '#ffea00');
   } else if (it.type === 'mine') {
     mineCount = Math.min(3, mineCount + 1);
     updateInventoryUI();
-    spawnFloatingText('+1 MÌN 💣', it.x, it.y, '#ff1744');
+    spawnFloatingText('+1 MÌN', it.x, it.y, '#ff1744');
     spawnPickupParticles(it.x, it.y, '#ff1744');
   } else if (it.type === 'gun') {
     // GUN: +1 bullet, stackable (no max limit)
     gunAmmo++;
     updateInventoryUI();
-    spawnFloatingText('+1 ĐẠN 🔫', it.x, it.y, '#ffab40');
+    spawnFloatingText('+1 ĐẠN', it.x, it.y, '#ffab40');
     spawnPickupParticles(it.x, it.y, '#ffab40');
-    showToast(`🔫 Nhặt được súng! Đạn: ${gunAmmo} viên (Phím 3/F hoặc click để bắn)`);
+    showToast(`Nhặt được súng! Đạn: ${gunAmmo} viên (Phím 3/F hoặc click để bắn)`);
   } else if (it.type === 'coin') {
     const coinsEarned = 15;
     playerCoins += coinsEarned;
     saveShopData();
     updateCoinDisplays();
-    spawnFloatingText(`+${coinsEarned} XU 🪙`, it.x, it.y, '#ffd700');
+    spawnFloatingText(`+${coinsEarned} XU`, it.x, it.y, '#ffd700');
     spawnPickupParticles(it.x, it.y, '#ffd700');
-    showToast(`🪙 Nhặt được +${coinsEarned} Xu mua Skin!`);
+    showToast(`Nhặt được +${coinsEarned} Xu mua Skin!`);
   }
 }
 
@@ -1239,6 +1247,18 @@ function startFireWave() {
     sweepAcc: 0,
     thickness: isDiag ? 4 : 3,
   };
+
+  // "lúc núi lửa xảy ra thì lâu lâu có mưa sấm chớp xảy hoặc không"
+  // Dynamic chance (42%): Volcanic storm combines eruption with sudden lightning & rain
+  const triggerStorm = Math.random() < 0.42;
+  if (triggerStorm && !thunderstorm) {
+    setTimeout(() => {
+      if (running && !thunderstorm) {
+        startThunderstorm();
+        showToast('THIÊN TAI KÉP: Núi Lửa kèm Mưa Bão Sấm Chớp!');
+      }
+    }, 1800);
+  }
 }
 
 function updateFireWave(dt) {
@@ -1632,31 +1652,31 @@ function spawnElectricSparks(gx, gy) {
 // ══════════════════════════════════════════════
 
 function startTornado() {
-  const corners = [
-    { x: CELL * 3, y: CELL * 3 },
-    { x: CANVAS_PX - CELL * 3, y: CELL * 3 },
-    { x: CELL * 3, y: CANVAS_PX - CELL * 3 },
-    { x: CANVAS_PX - CELL * 3, y: CANVAS_PX - CELL * 3 },
-    { x: CANVAS_PX / 2, y: CELL * 2 },
-    { x: CANVAS_PX / 2, y: CANVAS_PX - CELL * 2 },
-  ];
-  const count = Math.floor(Math.random() * 3) + 1;
+  const quadrants = [
+    { x: CELL * 3.5, y: CELL * 3.5, wander: 0.6 },
+    { x: CANVAS_PX - CELL * 3.5, y: CANVAS_PX - CELL * 3.5, wander: 3.7 },
+    { x: CANVAS_PX - CELL * 3.5, y: CELL * 3.5, wander: 2.2 },
+    { x: CELL * 3.5, y: CANVAS_PX - CELL * 3.5, wander: 5.3 },
+  ].sort(() => Math.random() - 0.5);
+
+  const count = Math.min(3, Math.max(2, Math.floor(Math.random() * 2) + 2)); // 2 or 3 tornadoes
   tornadoes = [];
-  const shuffled = [...corners].sort(() => Math.random() - 0.5);
+  tornadoConvergenceTimer = 0;
+  isTornadoConverging = false;
 
   for (let i = 0; i < count; i++) {
-    const c = shuffled[i % shuffled.length];
-    const ox = (Math.random() - 0.5) * CELL * 2;
-    const oy = (Math.random() - 0.5) * CELL * 2;
+    const q = quadrants[i % quadrants.length];
     tornadoes.push({
       id: i,
-      x: Math.max(CELL * 2, Math.min(CANVAS_PX - CELL * 2, c.x + ox)),
-      y: Math.max(CELL * 2, Math.min(CANVAS_PX - CELL * 2, c.y + oy)),
-      vx: (Math.random() - 0.5) * 1.5,
-      vy: (Math.random() - 0.5) * 1.5,
+      x: q.x + (Math.random() - 0.5) * CELL,
+      y: q.y + (Math.random() - 0.5) * CELL,
+      vx: Math.cos(q.wander) * 1.3,
+      vy: Math.sin(q.wander) * 1.3,
       state: 'warning',
       stateTime: 0,
       angle: Math.random() * Math.PI,
+      wanderAngle: q.wander,
+      patrolAngle: i * (Math.PI * 2 / count),
     });
   }
   tornado = tornadoes[0] || null;
@@ -1675,6 +1695,28 @@ function updateTornado(dt) {
       tornadoTimer = TORNADO_INTERVAL_MIN + Math.random() * (TORNADO_INTERVAL_MAX - TORNADO_INTERVAL_MIN);
     }
     return;
+  }
+
+  // "Lốc xoáy xảy ra có thể tản ra đừng bao giờ đi chụm, chỉ lâu lâu nó dính chụm thôi"
+  // Dynamic cycle: 85% of time they strongly disperse/spread out; every ~16s for 2.8s they briefly converge
+  tornadoConvergenceTimer += dt;
+  if (tornadoConvergenceTimer > 15500 && tornadoConvergenceTimer <= 18300) {
+    if (!isTornadoConverging) {
+      isTornadoConverging = true;
+      showToast('CƠN BÃO HỢP LỰC! Các cơn lốc đang hút vào nhau!');
+    }
+  } else if (tornadoConvergenceTimer > 18300) {
+    // Violent explosive repulsion when clumping ends
+    if (isTornadoConverging) {
+      isTornadoConverging = false;
+      tornadoConvergenceTimer = 0;
+      wrapper.classList.add('shake');
+      setTimeout(() => wrapper.classList.remove('shake'), 350);
+      for (const t of tornadoes) {
+        t.vx *= -2.2;
+        t.vy *= -2.2;
+      }
+    }
   }
 
   let allDone = true;
@@ -1700,15 +1742,60 @@ function updateTornado(dt) {
       if (t.stateTime < TORNADO_DURATION) allDone = false;
       else continue;
 
-      let targetX = player.x * CELL + CELL / 2;
-      let targetY = player.y * CELL + CELL / 2;
+      // 1. Separation / Anti-Clustering Force (Never cluster during normal roaming)
+      for (let j = 0; j < tornadoes.length; j++) {
+        if (i === j) continue;
+        const other = tornadoes[j];
+        const tdx = t.x - other.x;
+        const tdy = t.y - other.y;
+        const tdist = Math.hypot(tdx, tdy) || 1;
+
+        if (!isTornadoConverging) {
+          // Normal: Strong repulsion force so tornadoes disperse across the entire map
+          const SEPARATION_DIST = 230;
+          if (tdist < SEPARATION_DIST) {
+            const repel = Math.pow(1 - tdist / SEPARATION_DIST, 1.4) * 0.18;
+            t.vx += (tdx / tdist) * repel;
+            t.vy += (tdy / tdist) * repel;
+          }
+        } else {
+          // Occasional brief clumping ("lâu lâu dính chụm thôi")
+          const pull = 0.045;
+          t.vx -= (tdx / tdist) * pull;
+          t.vy -= (tdy / tdist) * pull;
+
+          // Electric plasma sparks bridging tornadoes
+          if (Math.random() < 0.25 && particles.length < 90) {
+            particles.push({
+              x: t.x + (Math.random() - 0.5) * 16,
+              y: t.y + (Math.random() - 0.5) * 16,
+              vx: -(tdx / tdist) * 2.2,
+              vy: -(tdy / tdist) * 2.2,
+              size: 2.2,
+              color: '#00e5ff',
+              life: 180,
+              maxLife: 180,
+            });
+          }
+        }
+      }
+
+      // 2. Independent wandering heading (each tornado roams differently)
+      t.wanderAngle = (t.wanderAngle || 0) + (Math.random() - 0.5) * 0.22;
+      t.vx += Math.cos(t.wanderAngle) * 0.035;
+      t.vy += Math.sin(t.wanderAngle) * 0.035;
+
+      // 3. Gentle player tracking with patrol offset (does not overpower separation)
+      const offsetAngle = t.patrolAngle + performance.now() * 0.0008;
+      let targetX = (player.x * CELL + CELL / 2) + Math.cos(offsetAngle) * 75;
+      let targetY = (player.y * CELL + CELL / 2) + Math.sin(offsetAngle) * 75;
 
       if (isMultiplayer) {
         let minDist = 99999;
         for (const rp of roomPlayers) {
           if (rp.isAlive) {
-            const rpx = rp.x * CELL + CELL / 2;
-            const rpy = rp.y * CELL + CELL / 2;
+            const rpx = (rp.x || 0) * CELL + CELL / 2 + Math.cos(offsetAngle) * 75;
+            const rpy = (rp.y || 0) * CELL + CELL / 2 + Math.sin(offsetAngle) * 75;
             const d = Math.hypot(rpx - t.x, rpy - t.y);
             if (d < minDist) { minDist = d; targetX = rpx; targetY = rpy; }
           }
@@ -1719,20 +1806,24 @@ function updateTornado(dt) {
       const dy = targetY - t.y;
       const dist = Math.hypot(dx, dy) || 1;
 
-      t.vx += (dx / dist) * 0.035;
-      t.vy += (dy / dist) * 0.035;
+      // Gentle homing bias
+      t.vx += (dx / dist) * 0.016;
+      t.vy += (dy / dist) * 0.016;
+
       const speed = Math.hypot(t.vx, t.vy);
-      if (speed > 1.6) { t.vx = (t.vx / speed) * 1.6; t.vy = (t.vy / speed) * 1.6; }
+      const maxSpd = isTornadoConverging ? 2.4 : 1.75;
+      if (speed > maxSpd) { t.vx = (t.vx / speed) * maxSpd; t.vy = (t.vy / speed) * maxSpd; }
 
       t.x += t.vx * (dt / 16);
       t.y += t.vy * (dt / 16);
 
-      if (t.x < CELL) { t.x = CELL; t.vx *= -1; }
-      if (t.x > CANVAS_PX - CELL) { t.x = CANVAS_PX - CELL; t.vx *= -1; }
-      if (t.y < CELL) { t.y = CELL; t.vy *= -1; }
-      if (t.y > CANVAS_PX - CELL) { t.y = CANVAS_PX - CELL; t.vy *= -1; }
+      // Bounce smoothly off boundaries
+      if (t.x < CELL * 1.5) { t.x = CELL * 1.5; t.vx = Math.abs(t.vx); }
+      if (t.x > CANVAS_PX - CELL * 1.5) { t.x = CANVAS_PX - CELL * 1.5; t.vx = -Math.abs(t.vx); }
+      if (t.y < CELL * 1.5) { t.y = CELL * 1.5; t.vy = Math.abs(t.vy); }
+      if (t.y > CANVAS_PX - CELL * 1.5) { t.y = CANVAS_PX - CELL * 1.5; t.vy = -Math.abs(t.vy); }
 
-      if (Math.random() < 0.25 && particles.length < 80) {
+      if (Math.random() < 0.28 && particles.length < 80) {
         const pAngle = Math.random() * Math.PI * 2;
         const pDist = 8 + Math.random() * 22;
         particles.push({
@@ -1741,7 +1832,7 @@ function updateTornado(dt) {
           vx: Math.cos(pAngle + Math.PI / 2) * 1.6,
           vy: Math.sin(pAngle + Math.PI / 2) * 1.6,
           size: 2 + Math.random() * 2.5,
-          color: Math.random() < 0.5 ? '#cfd8dc' : '#b0bec5',
+          color: isTornadoConverging ? '#00e5ff' : (Math.random() < 0.5 ? '#cfd8dc' : '#b0bec5'),
           life: 250,
           maxLife: 250,
         });
@@ -1749,7 +1840,7 @@ function updateTornado(dt) {
     }
   }
 
-  if (allDone) { tornadoes = []; tornado = null; }
+  if (allDone) { tornadoes = []; tornado = null; isTornadoConverging = false; }
   else { tornado = tornadoes[0] || null; }
 }
 
@@ -1849,17 +1940,57 @@ function spawnEarthDust(gx, gy) {
 // ══════════════════════════════════════════════
 
 function startBombEvent() {
-  const numBombs = 1 + (Math.random() < 0.4 ? 1 : 0);
+  const numBombs = 1 + (Math.random() < 0.5 ? 1 : 0) + (survivalTime > 25 && Math.random() < 0.35 ? 1 : 0);
+
+  // Divide map into 4 quadrants for wide dispersal across the arena
+  const sectors = [
+    { minX: 1, maxX: 8,  minY: 1, maxY: 8 },
+    { minX: 11, maxX: 18, minY: 1, maxY: 8 },
+    { minX: 1, maxX: 8,  minY: 11, maxY: 18 },
+    { minX: 11, maxX: 18, minY: 11, maxY: 18 },
+  ].sort(() => Math.random() - 0.5);
 
   for (let i = 0; i < numBombs; i++) {
-    let bx, by, tries = 0;
-    do {
-      bx = Math.floor(Math.random() * GRID);
-      by = Math.floor(Math.random() * GRID);
-      tries++;
-    } while (tries < 100 && (Math.abs(bx - player.x) < 3 && Math.abs(by - player.y) < 3));
+    const sec = sectors[i % sectors.length];
+    let bx = 0, by = 0, tries = 0;
+    let found = false;
 
-    bombs.push({ x: bx, y: by, state: 'ticking', stateTime: 0, fuseTime: BOMB_FUSE_TIME });
+    while (tries < 120 && !found) {
+      tries++;
+      bx = Math.floor(sec.minX + Math.random() * (sec.maxX - sec.minX + 1));
+      by = Math.floor(sec.minY + Math.random() * (sec.maxY - sec.minY + 1));
+
+      // Must be at least 3.2 cells away from player
+      if (Math.hypot(bx - player.x, by - player.y) < 3.2) continue;
+
+      // "bom nổ cũng tản ra nổ random tùy chỗ đừng dính chụm"
+      // Must be strictly separated from ALL other bombs (minimum 7.0 cells)
+      let tooClose = false;
+      for (const eb of bombs) {
+        if (Math.hypot(bx - eb.x, by - eb.y) < 6.8) {
+          tooClose = true;
+          break;
+        }
+      }
+      if (!tooClose) found = true;
+    }
+
+    if (!found) {
+      // Fallback
+      bx = Math.floor(1 + Math.random() * (GRID - 2));
+      by = Math.floor(1 + Math.random() * (GRID - 2));
+    }
+
+    // Stagger fuse times randomly so they explode independently at different seconds
+    const staggeredFuse = BOMB_FUSE_TIME + (i * 1200) + (Math.random() - 0.5) * 1400;
+
+    bombs.push({
+      x: bx,
+      y: by,
+      state: 'ticking',
+      stateTime: 0,
+      fuseTime: Math.max(3200, staggeredFuse),
+    });
   }
 }
 
@@ -1935,24 +2066,24 @@ function updateWarningBanners() {
   if (fireWave && fireWave.state === 'warning') {
     const sec = Math.max(0, (FIRE_WARN_TIME - fireWave.stateTime) / 1000).toFixed(1);
     const scope = fireWave.isDiag ? (fireWave.isFullSweep ? 'CHÉO TOÀN SÂN' : 'QUÉT CHÉO') : (fireWave.isFullSweep ? 'QUÉT HẾT SÂN' : `${fireWave.maxDistance} Ô`);
-    warnings.push(`🔥 NÚI LỬA (${scope}) [${sec}s]`);
+    warnings.push(`NÚI LỬA (${scope}) [${sec}s]`);
   }
   if (thunderstorm && thunderstorm.state === 'warning') {
     const sec = Math.max(0, (THUNDER_WARN_TIME - thunderstorm.stateTime) / 1000).toFixed(1);
-    warnings.push(`⚡ SẤM CHỚP & MƯA [${sec}s]`);
+    warnings.push(`BÃO SẤM CHỚP & MƯA [${sec}s]`);
   }
   const warnTornado = tornadoes.find(t => t.state === 'warning');
   if (warnTornado) {
     const sec = Math.max(0, (TORNADO_WARN_TIME - warnTornado.stateTime) / 1000).toFixed(1);
-    const countText = tornadoes.length > 1 ? ` (${tornadoes.length} CƠN LỐC)` : '';
-    warnings.push(`🌪️ LỐC XOÁY${countText} [${sec}s]`);
+    const countText = tornadoes.length > 1 ? ` (${tornadoes.length} CƠN LỐC TẢN RỘNG)` : '';
+    warnings.push(`LỐC XOÁY${countText} [${sec}s]`);
   }
   if (landslide && landslide.state === 'warning') {
     const sec = Math.max(0, (LANDSLIDE_WARN_TIME - landslide.stateTime) / 1000).toFixed(1);
-    warnings.push(`🕳️ SỤT LỞ ${landslide.zones.length} VÙNG [${sec}s]`);
+    warnings.push(`SỤT LỞ ${landslide.zones.length} VÙNG [${sec}s]`);
   }
 
-  if (warnings.length > 0) showWarning('⚠️ ' + warnings.join(' | '));
+  if (warnings.length > 0) showWarning('[CẢNH BÁO HIỂM HỌA] ' + warnings.join(' | '));
   else hideWarning();
 }
 
@@ -1965,15 +2096,12 @@ function hideWarning() {
 }
 
 // ── Game loop ─────────────────────────────────
-let accumulator = 0;
-
 function loop(now) {
   loopId = requestAnimationFrame(loop);
   const dt = now - lastTime;
   lastTime = now;
 
   if (!running || paused) { draw(); return; }
-
   if (isCountingDown) { draw(); return; }
 
   if (damageCooldown > 0) damageCooldown -= dt;
@@ -1981,11 +2109,11 @@ function loop(now) {
 
   for (const t of placedTraps) {
     if (t.armTimer > 0) t.armTimer -= dt;
-    if (t.ownerSlot === mySlot && (player.x !== t.x || player.y !== t.y)) t.steppedOff = true;
+    if (t.ownerSlot === mySlot && Math.hypot(player.x - t.x, player.y - t.y) > 0.85) t.steppedOff = true;
   }
   for (const m of placedMines) {
     if (m.armTimer > 0) m.armTimer -= dt;
-    if (m.ownerSlot === mySlot && (player.x !== m.x || player.y !== m.y)) m.steppedOff = true;
+    if (m.ownerSlot === mySlot && Math.hypot(player.x - m.x, player.y - m.y) > 0.85) m.steppedOff = true;
   }
 
   if (!isSpectator) survivalTime += dt / 1000;
@@ -2007,6 +2135,11 @@ function loop(now) {
 
   updateWarningBanners();
 
+  // "tui muốn di chuyển không phải khối ô nữa"
+  // Smooth, continuous movement updated every frame
+  updateMovement(dt);
+  if (!running) return;
+
   if (!isSpectator) {
     checkHazardDamage(dt);
     checkTrapsAndMinesTrigger();
@@ -2017,37 +2150,140 @@ function loop(now) {
     broadcastDisasterSync();
   }
 
-  accumulator += dt;
-  let baseStep = SPEEDS[currentSpeed];
+  draw();
+}
 
-  while (accumulator >= baseStep) {
-    accumulator -= baseStep;
-    update();
-    if (!running) return;
+// ── Smooth Continuous Movement (Non-Grid) ──────
+function updateMovement(dt) {
+  if (trapFrozenTimer > 0 || isSpectator) return;
+
+  // Determine directional input from held keyboard keys
+  let inputX = 0;
+  let inputY = 0;
+
+  if (keysDown.has('ArrowUp') || keysDown.has('w') || keysDown.has('W')) inputY -= 1;
+  if (keysDown.has('ArrowDown') || keysDown.has('s') || keysDown.has('S')) inputY += 1;
+  if (keysDown.has('ArrowLeft') || keysDown.has('a') || keysDown.has('A')) inputX -= 1;
+  if (keysDown.has('ArrowRight') || keysDown.has('d') || keysDown.has('D')) inputX += 1;
+
+  if (inputX !== 0 || inputY !== 0) {
+    const len = Math.hypot(inputX, inputY);
+    dir.x = inputX / len;
+    dir.y = inputY / len;
+    nextDir.x = dir.x;
+    nextDir.y = dir.y;
+  } else if (nextDir && (nextDir.x !== 0 || nextDir.y !== 0)) {
+    // If no keys held, keep running in last selected direction (swipe, mobile D-pad, auto-runner)
+    dir.x = nextDir.x;
+    dir.y = nextDir.y;
   }
 
-  draw();
+  if (dir.x === 0 && dir.y === 0) return;
+
+  // Smooth speeds in grid cells per second
+  const speedTable = { slow: 4.8, normal: 6.4, fast: 8.2 };
+  const cellSpeed = speedTable[currentSpeed] || 6.4;
+  const dist = cellSpeed * (dt / 1000);
+
+  // Update floating-point position
+  player.x += dir.x * dist;
+  player.y += dir.y * dist;
+
+  // Smooth arena wrap-around without block snapping
+  if (player.x < 0) player.x += GRID;
+  if (player.x >= GRID) player.x -= GRID;
+  if (player.y < 0) player.y += GRID;
+  if (player.y >= GRID) player.y -= GRID;
+
+  // Running cycle for leg swing & torso bob
+  player.runDist = (player.runDist || 0) + dist * CELL;
+
+  // Smooth target facing angle
+  const targetAngle = Math.atan2(dir.y, dir.x);
+  if (player.angle === undefined) player.angle = targetAngle;
+  else {
+    let diff = targetAngle - player.angle;
+    while (diff < -Math.PI) diff += Math.PI * 2;
+    while (diff > Math.PI) diff -= Math.PI * 2;
+    player.angle += diff * Math.min(1, dt * 0.02);
+  }
+
+  // Smooth dynamic dust/trail particles
+  if (Math.random() < 0.35) {
+    trail.push({ x: player.x, y: player.y, alpha: 0.45 });
+  }
+
+  // Network sync throttle (send position every 60ms)
+  if (isMultiplayer) {
+    mpMoveSyncTimer += dt;
+    if (mpMoveSyncTimer >= 60) {
+      mpMoveSyncTimer = 0;
+      const currentPts = Math.floor(survivalTime * 10) + bonusScore;
+      broadcastNetworkMessage({
+        type: 'PLAYER_MOVE',
+        slot: mySlot,
+        x: player.x,
+        y: player.y,
+        dir: dir,
+        angle: player.angle,
+        runDist: player.runDist,
+        hp: hp,
+        isFrozen: trapFrozenTimer > 0,
+        score: currentPts,
+        time: survivalTime,
+        isAlive: !isSpectator,
+        hasGun: gunAmmo > 0,
+        skinId: equippedSkinId,
+      });
+    }
+  }
 }
 
 function checkHazardDamage(dt) {
   if (isSpectator) return;
-  const key = `${player.x},${player.y}`;
+  const gx = Math.floor(player.x);
+  const gy = Math.floor(player.y);
+  const key = `${gx},${gy}`;
+  const px = player.x * CELL + CELL / 2;
+  const py = player.y * CELL + CELL / 2;
 
   if (puddleCells.has(key)) {
     if (burnDuration > 0) {
       burnDuration = 0;
-      spawnSteam(player.x, player.y);
-      spawnFloatingText('💨 Đã dập tắt lửa!', player.x, player.y, '#40c4ff');
+      spawnSteam(gx, gy);
+      spawnFloatingText('DẬP TẮT LỬA', player.x, player.y, '#40c4ff');
     }
   }
 
-  if (fireCells.has(key) || spreadingFlames.has(key)) {
+  // Check fire on current or immediate neighbor cells in player radius
+  let onFire = fireCells.has(key) || spreadingFlames.has(key);
+  if (!onFire) {
+    for (let ox = -1; ox <= 1; ox++) {
+      for (let oy = -1; oy <= 1; oy++) {
+        if (ox === 0 && oy === 0) continue;
+        const nk = `${(gx + ox + GRID) % GRID},${(gy + oy + GRID) % GRID}`;
+        if (fireCells.has(nk) || spreadingFlames.has(nk)) {
+          const ncx = ((gx + ox + GRID) % GRID) * CELL + CELL / 2;
+          const ncy = ((gy + oy + GRID) % GRID) * CELL + CELL / 2;
+          if (Math.hypot(px - ncx, py - ncy) < CELL * 0.65) {
+            onFire = true;
+            break;
+          }
+        }
+      }
+      if (onFire) break;
+    }
+  }
+
+  if (onFire) {
     burnDuration = Math.max(burnDuration, 2400);
   }
 
   for (const c of craters) {
     for (const cell of c.cells) {
-      if (cell.x === player.x && cell.y === player.y) {
+      const ccx = cell.x * CELL + CELL / 2;
+      const ccy = cell.y * CELL + CELL / 2;
+      if (Math.hypot(px - ccx, py - ccy) < CELL * 0.65) {
         burnDuration = Math.max(burnDuration, 1600);
         break;
       }
@@ -2062,8 +2298,8 @@ function checkHazardDamage(dt) {
       takeTickDamage(4, 'Bị thiêu đốt bởi ngọn lửa!', 'fire');
       if (particles.length < 80) {
         particles.push({
-          x: player.x * CELL + CELL / 2 + (Math.random() - 0.5) * 8,
-          y: player.y * CELL + CELL / 2,
+          x: px + (Math.random() - 0.5) * 8,
+          y: py,
           vx: (Math.random() - 0.5) * 0.8,
           vy: -1.2 - Math.random() * 0.8,
           size: 2.5,
@@ -2103,8 +2339,6 @@ function checkHazardDamage(dt) {
     }
   }
 
-  const px = player.x * CELL + CELL / 2;
-  const py = player.y * CELL + CELL / 2;
   let inVortex = false;
   for (const t of tornadoes) {
     if (t.state === 'active') {
@@ -2121,48 +2355,6 @@ function checkHazardDamage(dt) {
     }
   }
   if (!inVortex) tornadoTickCooldown = Math.min(tornadoTickCooldown, 80);
-}
-
-// ── Update runner ─────────────────────────────
-function update() {
-  if (trapFrozenTimer > 0) return;
-
-  dir = { ...nextDir };
-  if (dir.x === 0 && dir.y === 0) return;
-
-  if (!isSpectator) trail.push({ x: player.x, y: player.y, alpha: 0.5 });
-
-  let nx = player.x + dir.x;
-  let ny = player.y + dir.y;
-
-  if (nx < 0) nx = GRID - 1;
-  if (nx >= GRID) nx = 0;
-  if (ny < 0) ny = GRID - 1;
-  if (ny >= GRID) ny = 0;
-
-  player.x = nx;
-  player.y = ny;
-
-  if (isMultiplayer) {
-    const currentPts = Math.floor(survivalTime * 10) + bonusScore;
-    broadcastNetworkMessage({
-      type: 'PLAYER_MOVE',
-      slot: mySlot,
-      x: player.x,
-      y: player.y,
-      dir: dir,
-      hp: hp,
-      isFrozen: trapFrozenTimer > 0,
-      score: currentPts,
-      time: survivalTime,
-      isAlive: !isSpectator,
-      hasGun: gunAmmo > 0,
-      skinId: equippedSkinId,
-    });
-  }
-
-  if (isSpectator) return;
-  checkTrapsAndMinesTrigger();
 }
 
 // ── Player Death Handling ─────────────────────
@@ -2346,11 +2538,16 @@ function drawWaterPuddles() {
       ctx.fillStyle = `rgba(0, 176, 255, ${0.55 * flicker})`;
       ctx.fillRect(x + 1, y + 1, CELL - 2, CELL - 2);
 
-      ctx.fillStyle = `rgba(255, 234, 0, ${0.85 * flicker})`;
-      ctx.font = '11px serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('⚡', x + CELL / 2, y + CELL / 2 + 4);
-      ctx.textAlign = 'start';
+      const cx = x + CELL / 2;
+      const cy = y + CELL / 2;
+      ctx.strokeStyle = `rgba(255, 234, 0, ${0.9 * flicker})`;
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.moveTo(cx - 2, cy - 6);
+      ctx.lineTo(cx + 1, cy - 1);
+      ctx.lineTo(cx - 2, cy + 1);
+      ctx.lineTo(cx + 2, cy + 6);
+      ctx.stroke();
     } else {
       const ripple = 0.3 + Math.sin(now + gx * 1.5 + gy * 1.2) * 0.1;
       ctx.fillStyle = `rgba(0, 176, 255, ${ripple})`;
@@ -2373,9 +2570,16 @@ function drawPlacedTraps() {
     ctx.save();
     ctx.shadowColor = 'rgba(255, 234, 0, 0.7)';
     ctx.shadowBlur = 8;
-    ctx.font = '16px serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('🪤', cx, cy + 6);
+    ctx.strokeStyle = '#ffea00';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 9, 0.3, Math.PI - 0.3);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(cx, cy, 9, Math.PI + 0.3, Math.PI * 2 - 0.3);
+    ctx.stroke();
+    ctx.fillStyle = '#ffea00';
+    ctx.fillRect(cx - 3, cy - 3, 6, 6);
     ctx.restore();
   }
 }
@@ -2387,10 +2591,18 @@ function drawPlacedMines() {
 
     if (m.ownerSlot === mySlot) {
       ctx.save();
-      ctx.globalAlpha = 0.28;
-      ctx.font = '14px serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('💣', cx, cy + 5);
+      ctx.globalAlpha = 0.38;
+      ctx.fillStyle = '#263238';
+      ctx.beginPath();
+      ctx.arc(cx, cy, 7, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#ff5252';
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+      ctx.fillStyle = '#ff1744';
+      ctx.beginPath();
+      ctx.arc(cx, cy, 2, 0, Math.PI * 2);
+      ctx.fill();
       ctx.restore();
     }
   }
@@ -2408,19 +2620,22 @@ function drawSpreadingFlames() {
 
     const flicker = 0.7 + Math.sin(time * 2 + f.x * 2.3 + f.y * 1.7) * 0.3;
 
-    const grd = ctx.createRadialGradient(cx, cy, 1, cx, cy, CELL * 0.65);
-    grd.addColorStop(0, `rgba(255, 234, 0, ${0.7 * flicker})`);
-    grd.addColorStop(0.5, `rgba(255, 110, 64, ${0.5 * flicker})`);
+    const grd = ctx.createRadialGradient(cx, cy, 1, cx, cy, CELL * 0.7);
+    grd.addColorStop(0, `rgba(255, 234, 0, ${0.75 * flicker})`);
+    grd.addColorStop(0.5, `rgba(255, 110, 64, ${0.55 * flicker})`);
     grd.addColorStop(1, 'transparent');
     ctx.fillStyle = grd;
     ctx.fillRect(x - 2, y - 2, CELL + 4, CELL + 4);
 
-    ctx.font = `${10 + Math.sin(time * 3 + f.x) * 2}px serif`;
-    ctx.textAlign = 'center';
-    ctx.globalAlpha = 0.85;
-    ctx.fillText('🔥', cx, cy + 4);
-    ctx.globalAlpha = 1;
-    ctx.textAlign = 'start';
+    // Procedural flame tongue
+    const fH = 8 + Math.sin(time * 4 + f.x * 2) * 3;
+    ctx.fillStyle = `rgba(255, 234, 0, ${0.9 * flicker})`;
+    ctx.beginPath();
+    ctx.moveTo(cx - 3, cy + 4);
+    ctx.quadraticCurveTo(cx - 5, cy, cx, cy - fH);
+    ctx.quadraticCurveTo(cx + 5, cy, cx + 3, cy + 4);
+    ctx.closePath();
+    ctx.fill();
   }
 }
 
@@ -2445,41 +2660,53 @@ function drawTornado() {
       ctx.fillStyle = `rgba(176, 190, 197, ${0.2 * pulse})`;
       ctx.fill();
 
-      ctx.shadowColor = '#cfd8dc';
-      ctx.shadowBlur = 12;
-      ctx.font = '24px serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('🌪️', t.x, t.y + 8);
+      // Rotating wind spirals
+      ctx.strokeStyle = '#cfd8dc';
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      ctx.arc(t.x, t.y, 14, now * 0.005, now * 0.005 + Math.PI * 1.5);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(t.x, t.y, 8, -now * 0.008, -now * 0.008 + Math.PI * 1.2);
+      ctx.stroke();
 
       ctx.font = '800 11px "JetBrains Mono", monospace';
       ctx.fillStyle = '#f8fafc';
+      ctx.textAlign = 'center';
       ctx.fillText(sec + 's', t.x, t.y - 18);
       ctx.restore();
     } else if (t.state === 'active') {
       ctx.save();
       const tAngle = t.angle;
 
-      for (let r = 3; r >= 1; r--) {
-        const radius = r * 13;
-        const alpha = 0.22 + (3 - r) * 0.14;
-
-        ctx.strokeStyle = `rgba(236, 239, 241, ${alpha})`;
-        ctx.lineWidth = 3 - r * 0.5;
+      // Concentric rotating vortex arms
+      for (let r = 4; r >= 1; r--) {
+        const radius = r * 11;
+        const alpha = 0.2 + (4 - r) * 0.15;
+        ctx.strokeStyle = isTornadoConverging
+          ? `rgba(0, 229, 255, ${alpha + 0.15})`
+          : `rgba(236, 239, 241, ${alpha})`;
+        ctx.lineWidth = 3.5 - r * 0.6;
         ctx.beginPath();
-        ctx.ellipse(t.x, t.y, radius, radius * 0.65, tAngle * (r % 2 === 0 ? 1 : -1), 0, Math.PI * 2);
+        ctx.ellipse(t.x, t.y, radius, radius * 0.6, tAngle * (r % 2 === 0 ? 1 : -1) + r, 0, Math.PI * 2);
         ctx.stroke();
       }
 
-      ctx.fillStyle = 'rgba(69, 90, 100, 0.35)';
+      // Dark eye of the storm
+      const eyeGrd = ctx.createRadialGradient(t.x, t.y, 1, t.x, t.y, CELL * 0.8);
+      eyeGrd.addColorStop(0, '#102027');
+      eyeGrd.addColorStop(0.7, 'rgba(55, 71, 79, 0.4)');
+      eyeGrd.addColorStop(1, 'transparent');
+      ctx.fillStyle = eyeGrd;
       ctx.beginPath();
-      ctx.arc(t.x, t.y, CELL * 1.3, 0, Math.PI * 2);
+      ctx.arc(t.x, t.y, CELL * 0.8, 0, Math.PI * 2);
       ctx.fill();
 
-      ctx.shadowColor = '#90a4ae';
-      ctx.shadowBlur = 12;
-      ctx.font = '26px serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('🌪️', t.x, t.y + 9);
+      // Central eye core
+      ctx.fillStyle = isTornadoConverging ? '#00e5ff' : '#cfd8dc';
+      ctx.beginPath();
+      ctx.arc(t.x, t.y, 3, 0, Math.PI * 2);
+      ctx.fill();
 
       ctx.restore();
     }
@@ -2542,12 +2769,24 @@ function drawLandslideWarning() {
     ctx.save();
     ctx.shadowColor = 'rgba(255, 145, 0, 0.8)';
     ctx.shadowBlur = 12;
-    ctx.font = '20px serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('🕳️', zx, zy + 6);
+
+    // Seismic fault fissure graphics
+    ctx.fillStyle = '#1b120c';
+    ctx.beginPath();
+    ctx.arc(zx, zy, 9, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#ff9800';
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    ctx.moveTo(zx - 7, zy - 4);
+    ctx.lineTo(zx - 2, zy + 2);
+    ctx.lineTo(zx + 2, zy - 3);
+    ctx.lineTo(zx + 7, zy + 4);
+    ctx.stroke();
 
     ctx.font = '800 11px "JetBrains Mono", monospace';
     ctx.fillStyle = '#ffea00';
+    ctx.textAlign = 'center';
     ctx.fillText(remainingSec + 's', zx, zy - 13);
     ctx.restore();
   }
@@ -2561,75 +2800,115 @@ function drawItems() {
 
     ctx.save();
     if (it.type === 'heart') {
-      ctx.shadowColor = 'rgba(255, 23, 68, 0.8)';
-      ctx.shadowBlur = 14;
-      ctx.fillStyle = 'rgba(255, 23, 68, 0.15)';
-      ctx.beginPath();
-      ctx.arc(x, y + bounce, CELL * 0.45, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.font = '16px serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('❤️', x, y + bounce + 5);
-    } else if (it.type === 'trap') {
-      ctx.shadowColor = 'rgba(255, 234, 0, 0.8)';
-      ctx.shadowBlur = 14;
-      ctx.fillStyle = 'rgba(255, 234, 0, 0.15)';
-      ctx.beginPath();
-      ctx.arc(x, y + bounce, CELL * 0.45, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.font = '15px serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('🪤', x, y + bounce + 5);
-    } else if (it.type === 'mine') {
-      ctx.shadowColor = 'rgba(255, 82, 82, 0.8)';
-      ctx.shadowBlur = 14;
-      ctx.fillStyle = 'rgba(255, 23, 68, 0.15)';
-      ctx.beginPath();
-      ctx.arc(x, y + bounce, CELL * 0.45, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.font = '15px serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('💣', x, y + bounce + 5);
-    } else if (it.type === 'gun') {
-      // Gun pickup item with orange glow
-      ctx.shadowColor = 'rgba(255, 145, 0, 0.9)';
+      // Bio-Medkit Energy Capsule
+      const pPulse = 1 + Math.sin(it.pulse || 0) * 0.15;
+      ctx.shadowColor = 'rgba(255, 23, 68, 0.9)';
       ctx.shadowBlur = 16;
-      ctx.fillStyle = 'rgba(255, 145, 0, 0.15)';
+
+      ctx.fillStyle = 'rgba(255, 23, 68, 0.25)';
       ctx.beginPath();
-      ctx.arc(x, y + bounce, CELL * 0.48, 0, Math.PI * 2);
+      ctx.arc(x, y + bounce, 10 * pPulse, 0, Math.PI * 2);
       ctx.fill();
 
-      // Pulsing ring
+      ctx.strokeStyle = '#ff1744';
+      ctx.lineWidth = 1.8;
+      ctx.stroke();
+
+      // Glowing medical cross
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(x - 2, y + bounce - 6, 4, 12);
+      ctx.fillRect(x - 6, y + bounce - 2, 12, 4);
+
+    } else if (it.type === 'trap') {
+      // Tactical Bear Trap Pickup
+      ctx.shadowColor = 'rgba(255, 234, 0, 0.85)';
+      ctx.shadowBlur = 14;
+
+      ctx.fillStyle = 'rgba(255, 234, 0, 0.2)';
+      ctx.beginPath();
+      ctx.arc(x, y + bounce, 10, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Clamp jaws
+      ctx.strokeStyle = '#ffea00';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(x, y + bounce, 7.5, 0.3, Math.PI - 0.3);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(x, y + bounce, 7.5, Math.PI + 0.3, Math.PI * 2 - 0.3);
+      ctx.stroke();
+
+      // Trigger plate
+      ctx.fillStyle = '#ffea00';
+      ctx.beginPath();
+      ctx.arc(x, y + bounce, 2.5, 0, Math.PI * 2);
+      ctx.fill();
+
+    } else if (it.type === 'mine') {
+      // Proximity Landmine Pickup
+      ctx.shadowColor = 'rgba(255, 82, 82, 0.9)';
+      ctx.shadowBlur = 14;
+
+      // Dark titanium disc
+      ctx.fillStyle = '#263238';
+      ctx.beginPath();
+      ctx.arc(x, y + bounce, 9, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.strokeStyle = '#ff5252';
+      ctx.lineWidth = 1.6;
+      ctx.stroke();
+
+      // Blinking center LED diode
+      const blink = Math.sin(performance.now() * 0.012) > 0;
+      ctx.fillStyle = blink ? '#ff1744' : '#b71c1c';
+      ctx.beginPath();
+      ctx.arc(x, y + bounce, 3, 0, Math.PI * 2);
+      ctx.fill();
+
+    } else if (it.type === 'gun') {
+      // Plasma Blaster Pickup
+      ctx.shadowColor = 'rgba(255, 145, 0, 0.95)';
+      ctx.shadowBlur = 16;
+
+      ctx.fillStyle = 'rgba(255, 145, 0, 0.2)';
+      ctx.beginPath();
+      ctx.arc(x, y + bounce, 11, 0, Math.PI * 2);
+      ctx.fill();
+
       const ringPulse = 0.5 + Math.sin((it.pulse || 0) * 2) * 0.3;
       ctx.strokeStyle = `rgba(255, 171, 64, ${ringPulse})`;
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.arc(x, y + bounce, CELL * 0.5, 0, Math.PI * 2);
+      ctx.lineWidth = 1.6;
       ctx.stroke();
 
-      ctx.font = '16px serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('🔫', x, y + bounce + 5);
+      // Blaster chassis & barrel
+      ctx.fillStyle = '#eceff1';
+      ctx.fillRect(x - 5, y + bounce - 2, 11, 4);
+      ctx.fillRect(x - 2, y + bounce + 2, 4, 4);
+      // Cyan energy cell
+      ctx.fillStyle = '#00e5ff';
+      ctx.fillRect(x - 2, y + bounce - 1, 4, 2);
+
     } else if (it.type === 'coin') {
-      // Gold Coin item with sparkling ring
+      // Holographic Energy Coin
       ctx.shadowColor = 'rgba(255, 215, 0, 0.95)';
       ctx.shadowBlur = 16;
-      ctx.fillStyle = 'rgba(255, 215, 0, 0.2)';
+
+      ctx.fillStyle = '#ffb300';
       ctx.beginPath();
-      ctx.arc(x, y + bounce, CELL * 0.45, 0, Math.PI * 2);
+      ctx.arc(x, y + bounce, 8.5, 0, Math.PI * 2);
       ctx.fill();
 
-      // Pulsing gold ring
-      const coinPulse = 0.5 + Math.sin((it.pulse || 0) * 3) * 0.35;
-      ctx.strokeStyle = `rgba(255, 235, 59, ${coinPulse})`;
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.arc(x, y + bounce, CELL * 0.48, 0, Math.PI * 2);
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 1.3;
       ctx.stroke();
 
-      ctx.font = '16px serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('🪙', x, y + bounce + 5);
+      // Inner cyber coin pattern
+      ctx.fillStyle = '#ffe082';
+      ctx.beginPath();
+      ctx.arc(x, y + bounce, 4.5, 0, Math.PI * 2);
+      ctx.fill();
     }
     ctx.restore();
   }
@@ -2638,14 +2917,18 @@ function drawItems() {
 // ── Draw All Survivors ─
 function drawAllSurvivors() {
   if (!isMultiplayer) {
-    drawSingleSurvivor(player, dir, mySlot, myPlayerName, hp, trapFrozenTimer > 0, damageCooldown > 0, isSpectator);
+    drawSingleSurvivor(player, dir, mySlot, myPlayerName + ' (Tôi)', hp, trapFrozenTimer > 0, damageCooldown > 0, isSpectator);
     return;
   }
 
   for (const rp of roomPlayers) {
     if (rp.slot !== mySlot) {
+      if (rp.renderX === undefined) { rp.renderX = rp.x || 0; rp.renderY = rp.y || 0; }
+      rp.renderX += ((rp.x || 0) - rp.renderX) * 0.35;
+      rp.renderY += ((rp.y || 0) - rp.renderY) * 0.35;
+
       drawSingleSurvivor(
-        { x: rp.x || 0, y: rp.y || 0 },
+        { x: rp.renderX, y: rp.renderY, angle: rp.angle, runDist: rp.runDist },
         rp.dir || { x: 0, y: 0 },
         rp.slot,
         rp.name || `P${rp.slot + 1}`,
@@ -2670,78 +2953,111 @@ function drawSingleSurvivor(p, pDir, slot, name, currentHp, isFrozen, isHit, isD
 
   ctx.save();
 
+  // Dead state: Cyber casualty beacon
   if (isDead) {
-    ctx.globalAlpha = 0.5;
-    ctx.font = '20px serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('👻', cx, cy + 6);
+    ctx.globalAlpha = 0.55;
+    ctx.strokeStyle = '#00e5ff';
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 10, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(cx - 6, cy); ctx.lineTo(cx + 6, cy);
+    ctx.moveTo(cx, cy - 6); ctx.lineTo(cx, cy + 6);
+    ctx.stroke();
+
     ctx.font = '700 9px "Inter", sans-serif';
     ctx.fillStyle = '#90a4ae';
-    ctx.fillText(name, cx, cy - 12);
+    ctx.textAlign = 'center';
+    ctx.fillText(name + ' [K.O]', cx, cy - 14);
     ctx.restore();
     return;
   }
 
+  // Trapped / Frozen state: Electromagnetic lockdown rings
   if (isFrozen) {
-    ctx.strokeStyle = '#ffea00';
-    ctx.lineWidth = 2;
+    const fPulse = 0.6 + Math.sin(now * 0.012) * 0.35;
+    ctx.strokeStyle = `rgba(255, 234, 0, ${fPulse})`;
+    ctx.lineWidth = 2.2;
     ctx.beginPath();
-    ctx.arc(cx, cy, CELL * 0.7, 0, Math.PI * 2);
+    ctx.arc(cx, cy, CELL * 0.72, 0, Math.PI * 2);
     ctx.stroke();
-    ctx.font = '14px serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('⛓️', cx, cy - 14);
+
+    // Lockdown cross
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(cx - 7, cy - 7); ctx.lineTo(cx + 7, cy + 7);
+    ctx.moveTo(cx + 7, cy - 7); ctx.lineTo(cx - 7, cy + 7);
+    ctx.stroke();
   }
 
-  // Glow effect
+  // Stride animation based on accumulated running distance
+  const runDist = p.runDist || 0;
+  const isMoving = (pDir.x !== 0 || pDir.y !== 0) && !isFrozen;
+  const legOffset = isMoving ? Math.sin(runDist * 0.28) * 4.5 : 0;
+  const bob = isMoving ? Math.abs(Math.sin(runDist * 0.28)) * 1.5 : 0;
+
+  // Facing angle
+  const facingAngle = (p.angle !== undefined) ? p.angle : Math.atan2(pDir.y || 0, pDir.x || 1);
+  const lookDirX = Math.cos(facingAngle);
+  const lookDirY = Math.sin(facingAngle);
+
+  // Ground shadow
+  ctx.fillStyle = 'rgba(0,0,0,0.35)';
+  ctx.beginPath();
+  ctx.ellipse(cx, cy + 9, 8, 3.2, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Glow aura
   ctx.shadowColor = skin.glow;
   ctx.shadowBlur = 10;
 
-  // Shadow
-  ctx.fillStyle = 'rgba(0,0,0,0.3)';
-  ctx.beginPath();
-  ctx.ellipse(cx, cy + 9, 8, 3, 0, 0, Math.PI * 2);
-  ctx.fill();
+  // Animated legs (swinging forward & back)
+  ctx.fillStyle = '#1e293b';
+  ctx.fillRect(cx - 4.5, cy + 4 - bob + legOffset, 3, 6);
+  ctx.fillRect(cx + 1.5, cy + 4 - bob - legOffset, 3, 6);
 
   // Torso
   ctx.fillStyle = skin.jacket;
   ctx.beginPath();
-  ctx.roundRect(cx - 6, cy - 2, 12, 11, 4);
+  ctx.roundRect(cx - 6, cy - 3 - bob, 12, 10, 3.5);
   ctx.fill();
 
-  // Backpack
-  ctx.fillStyle = '#4e342e';
-  ctx.fillRect(cx - (pDir.x || 0) * 4 - 3, cy - 1, 6, 8);
+  // Tactical Backpack
+  const backX = cx - lookDirX * 4;
+  const backY = cy - 2 - bob - lookDirY * 4;
+  ctx.fillStyle = '#3e2723';
+  ctx.beginPath();
+  ctx.roundRect(backX - 3, backY - 3, 6, 7, 2);
+  ctx.fill();
 
   // Head
-  ctx.fillStyle = '#fed7aa';
-  ctx.beginPath();
-  ctx.arc(cx, cy - 6, 6, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Cap
+  const headY = cy - 7 - bob;
   ctx.fillStyle = skin.cap;
   ctx.beginPath();
-  ctx.arc(cx, cy - 8, 5.5, Math.PI, Math.PI * 2);
+  ctx.arc(cx, headY, 6, 0, Math.PI * 2);
   ctx.fill();
 
-  // Eyes
-  const eyeX = cx + (pDir.x || 0) * 2.5;
-  const eyeY = cy - 6 + (pDir.y || 0) * 2.5;
-  ctx.fillStyle = '#1e293b';
+  // Glowing Tactical Visor Strip
+  const vx = cx + lookDirX * 3.5;
+  const vy = headY + lookDirY * 3.5;
+  ctx.shadowColor = skin.glow;
+  ctx.shadowBlur = 8;
+  ctx.fillStyle = skin.glow;
   ctx.beginPath();
-  ctx.arc(eyeX - 1.5, eyeY, 1.2, 0, Math.PI * 2);
-  ctx.arc(eyeX + 1.5, eyeY, 1.2, 0, Math.PI * 2);
+  ctx.arc(vx, vy, 2.2, 0, Math.PI * 2);
   ctx.fill();
+  ctx.shadowBlur = 0;
 
   // Mini Health Bar
   const hpPct = Math.max(0, Math.min(1, currentHp / MAX_HP));
   const barW = 20;
   const barH = 3;
   const barX = cx - barW / 2;
-  const barY = cy - 18;
+  const barY = cy - 19;
 
-  ctx.shadowBlur = 0;
   ctx.fillStyle = 'rgba(0,0,0,0.6)';
   ctx.fillRect(barX - 1, barY - 1, barW + 2, barH + 2);
 
@@ -2754,36 +3070,51 @@ function drawSingleSurvivor(p, pDir, slot, name, currentHp, isFrozen, isHit, isD
   ctx.textAlign = 'center';
   ctx.shadowColor = 'rgba(0,0,0,0.8)';
   ctx.shadowBlur = 4;
-  ctx.fillText(name, cx, cy - 22);
+  ctx.fillText(name, cx, cy - 23);
 
-  // Draw held laser gun if player has ammo
+  // Draw equipped plasma firearm and aiming guidance
   const hasGun = (slot === mySlot && gunAmmo > 0) || (slot !== mySlot && p.hasGun);
   if (hasGun && !isDead) {
-    ctx.save();
-    const gxDir = (pDir.x !== 0) ? pDir.x : 1;
-    const gyDir = pDir.y || 0;
-    const gunX = cx + gxDir * 7;
-    const gunY = cy + gyDir * 4 + 1;
+    const gunDist = 8;
+    const gunX = cx + lookDirX * gunDist;
+    const gunY = cy - bob + lookDirY * gunDist;
 
-    ctx.fillStyle = '#1e293b';
-    ctx.fillRect(gunX - 2, gunY - 2, 5, 3);
-    ctx.fillStyle = '#ff9100'; // Laser muzzle
-    ctx.fillRect(gunX + gxDir * 3 - 1, gunY - 1, 3, 2);
+    ctx.save();
+    ctx.fillStyle = '#263238';
+    ctx.fillRect(gunX - 2, gunY - 2, 5, 4);
+    ctx.fillStyle = '#ff9100'; // Plasma muzzle
+    ctx.fillRect(gunX + lookDirX * 3 - 1, gunY - 1, 3, 2);
+
+    // Laser aiming guide line
+    ctx.strokeStyle = 'rgba(255, 145, 0, 0.35)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3, 5]);
+    ctx.beginPath();
+    ctx.moveTo(gunX, gunY);
+    ctx.lineTo(gunX + lookDirX * 42, gunY + lookDirY * 42);
+    ctx.stroke();
+    ctx.setLineDash([]);
     ctx.restore();
   }
 
-  // Gun ammo indicator (if player has gun)
+  // Gun ammo indicator badge
   if (slot === mySlot && gunAmmo > 0 && !isDead) {
-    ctx.font = '800 9px "JetBrains Mono", monospace';
+    ctx.font = '800 8.5px "JetBrains Mono", monospace';
     ctx.fillStyle = '#ffab40';
     ctx.textAlign = 'left';
-    ctx.fillText(`🔫x${gunAmmo}`, cx + 10, cy - 2);
+    ctx.fillText(`x${gunAmmo}`, cx + 9, cy - 2);
   }
 
-  // On fire indicator
+  // On fire procedural flame tongues
   if (slot === mySlot && burnDuration > 0 && !isDead) {
-    ctx.font = '13px serif';
-    ctx.fillText('🔥', cx, cy - 32);
+    const fHeight = 7 + Math.sin(now * 0.02) * 3;
+    ctx.fillStyle = 'rgba(255, 87, 34, 0.85)';
+    ctx.beginPath();
+    ctx.moveTo(cx - 4, headY - 4);
+    ctx.quadraticCurveTo(cx - 6, headY - 8, cx, headY - 4 - fHeight);
+    ctx.quadraticCurveTo(cx + 6, headY - 8, cx + 4, headY - 4);
+    ctx.closePath();
+    ctx.fill();
   }
 
   ctx.restore();
@@ -2828,14 +3159,30 @@ function drawFireCells() {
     ctx.fillStyle = grd;
     ctx.fillRect(x - 2, y - 2, CELL + 4, CELL + 4);
 
-    if ((gx + gy) % 3 === 0) {
-      ctx.font = `${11 + Math.sin(time * 2 + gx) * 2}px serif`;
-      ctx.textAlign = 'center';
-      ctx.globalAlpha = 0.7 + Math.sin(time * 3 + gy) * 0.3;
-      ctx.fillText('🔥', cx, cy + 5);
-      ctx.globalAlpha = 1;
-      ctx.textAlign = 'start';
-    }
+    // Procedural licking dynamic flame tongues
+    const flameH = 6 + Math.sin(time * 3 + gx * 2.5 + gy * 1.7) * 3;
+    const sway = Math.sin(time * 4 + gy * 2) * 2;
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(cx - 4, cy + 5);
+    ctx.quadraticCurveTo(cx - 5 + sway, cy - 2, cx + sway, cy - flameH);
+    ctx.quadraticCurveTo(cx + 4 + sway, cy - 1, cx + 4, cy + 5);
+    ctx.closePath();
+    ctx.fillStyle = `rgba(255, 234, 0, ${0.85 * flicker})`;
+    ctx.shadowColor = '#ff3d00';
+    ctx.shadowBlur = 8;
+    ctx.fill();
+
+    // Inner bright core
+    ctx.beginPath();
+    ctx.moveTo(cx - 2, cy + 4);
+    ctx.quadraticCurveTo(cx - 1 + sway * 0.5, cy, cx + sway * 0.5, cy - flameH * 0.5);
+    ctx.quadraticCurveTo(cx + 2 + sway * 0.5, cy + 1, cx + 2, cy + 4);
+    ctx.closePath();
+    ctx.fillStyle = '#ffffff';
+    ctx.shadowBlur = 0;
+    ctx.fill();
+    ctx.restore();
   }
 }
 
@@ -2866,7 +3213,7 @@ function drawFireWarningEdge() {
     ctx.fillStyle = '#fff'; ctx.font = '800 16px Inter, sans-serif'; ctx.textAlign = 'center';
     ctx.shadowColor = 'rgba(255, 23, 68, 0.9)'; ctx.shadowBlur = 14;
     const bounceX = 20 + Math.sin(now * 0.01) * 8;
-    ctx.fillText(fireWave.isFullSweep ? '➜ 🔥 QUÉT HẾT!' : '➜ 🔥 NÉ PHẢI', bounceX + 70, CANVAS_PX / 2);
+    ctx.fillText(fireWave.isFullSweep ? '▶▶ BÃO LỬA: QUÉT HẾT!' : '▶▶ CẢNH BÁO: NÉ PHẢI', bounceX + 70, CANVAS_PX / 2);
   } else if (d === 'right') {
     grd = ctx.createLinearGradient(CANVAS_PX, 0, CANVAS_PX - warnDepth, 0);
     grd.addColorStop(0, `rgba(255, 23, 68, ${pulse * 0.8})`);
@@ -2883,7 +3230,7 @@ function drawFireWarningEdge() {
     ctx.fillStyle = '#fff'; ctx.font = '800 16px Inter, sans-serif'; ctx.textAlign = 'center';
     ctx.shadowColor = 'rgba(255, 23, 68, 0.9)'; ctx.shadowBlur = 14;
     const bounceX = CANVAS_PX - 20 - Math.sin(now * 0.01) * 8;
-    ctx.fillText(fireWave.isFullSweep ? '🔥 ⮜ QUÉT HẾT!' : '🔥 ⮜ NÉ TRÁI', bounceX - 70, CANVAS_PX / 2);
+    ctx.fillText(fireWave.isFullSweep ? 'BÃO LỬA: QUÉT HẾT! ◀◀' : 'CẢNH BÁO: NÉ TRÁI ◀◀', bounceX - 70, CANVAS_PX / 2);
   } else if (d === 'top') {
     grd = ctx.createLinearGradient(0, 0, 0, warnDepth);
     grd.addColorStop(0, `rgba(255, 23, 68, ${pulse * 0.8})`);
@@ -2900,7 +3247,7 @@ function drawFireWarningEdge() {
     ctx.fillStyle = '#fff'; ctx.font = '800 16px Inter, sans-serif'; ctx.textAlign = 'center';
     ctx.shadowColor = 'rgba(255, 23, 68, 0.9)'; ctx.shadowBlur = 14;
     const bounceY = 28 + Math.sin(now * 0.01) * 8;
-    ctx.fillText(fireWave.isFullSweep ? '⬇ 🔥 QUÉT HẾT! ⬇' : '⬇ 🔥 NÉ XUỐNG ⬇', CANVAS_PX / 2, bounceY + 30);
+    ctx.fillText(fireWave.isFullSweep ? '▼▼ BÃO LỬA: QUÉT HẾT! ▼▼' : '▼▼ CẢNH BÁO: NÉ XUỐNG ▼▼', CANVAS_PX / 2, bounceY + 30);
   } else if (d === 'bottom') {
     grd = ctx.createLinearGradient(0, CANVAS_PX, 0, CANVAS_PX - warnDepth);
     grd.addColorStop(0, `rgba(255, 23, 68, ${pulse * 0.8})`);
@@ -2917,7 +3264,7 @@ function drawFireWarningEdge() {
     ctx.fillStyle = '#fff'; ctx.font = '800 16px Inter, sans-serif'; ctx.textAlign = 'center';
     ctx.shadowColor = 'rgba(255, 23, 68, 0.9)'; ctx.shadowBlur = 14;
     const bounceY = CANVAS_PX - 20 - Math.sin(now * 0.01) * 8;
-    ctx.fillText(fireWave.isFullSweep ? '⬆ 🔥 QUÉT HẾT! ⬆' : '⬆ 🔥 NÉ LÊN ⬆', CANVAS_PX / 2, bounceY - 30);
+    ctx.fillText(fireWave.isFullSweep ? '▲▲ BÃO LỬA: QUÉT HẾT! ▲▲' : '▲▲ CẢNH BÁO: NÉ LÊN ▲▲', CANVAS_PX / 2, bounceY - 30);
   } else {
     // Diagonal warnings
     const corner = d === 'diag-tl' ? [0,0] : d === 'diag-tr' ? [CANVAS_PX,0] : d === 'diag-bl' ? [0,CANVAS_PX] : [CANVAS_PX,CANVAS_PX];
@@ -2932,7 +3279,7 @@ function drawFireWarningEdge() {
     const pp = posMap[d];
     ctx.fillStyle = '#fff'; ctx.font = '800 15px Inter, sans-serif'; ctx.textAlign = 'center';
     ctx.shadowColor = 'rgba(255, 23, 68, 0.9)'; ctx.shadowBlur = 14;
-    ctx.fillText(`${arrowMap[d]} 🔥 ${fireWave.isFullSweep ? 'QUÉT CHÉO HẾT!' : 'QUÉT CHÉO'} ${arrowMap[d]}`, pp[0], pp[1]);
+    ctx.fillText(`${arrowMap[d]} CẢNH BÁO: ${fireWave.isFullSweep ? 'QUÉT CHÉO HẾT' : 'BÃO LỬA CHÉO'} ${arrowMap[d]}`, pp[0], pp[1]);
   }
 
   ctx.restore();
@@ -2977,11 +3324,29 @@ function drawThunderstorm() {
       const zy = z.cy * CELL + CELL / 2;
 
       ctx.save();
-      ctx.shadowColor = 'rgba(0, 176, 255, 0.9)';
+      ctx.shadowColor = 'rgba(0, 229, 255, 0.95)';
       ctx.shadowBlur = 16;
-      ctx.font = '22px serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('⚡', zx, zy + 6);
+      ctx.fillStyle = '#00e5ff';
+      ctx.beginPath();
+      ctx.moveTo(zx + 2, zy - 10);
+      ctx.lineTo(zx - 6, zy + 1);
+      ctx.lineTo(zx - 1, zy + 1);
+      ctx.lineTo(zx - 3, zy + 11);
+      ctx.lineTo(zx + 7, zy - 1);
+      ctx.lineTo(zx + 1, zy - 1);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.moveTo(zx + 1, zy - 7);
+      ctx.lineTo(zx - 3, zy);
+      ctx.lineTo(zx, zy);
+      ctx.lineTo(zx - 1, zy + 7);
+      ctx.lineTo(zx + 4, zy);
+      ctx.lineTo(zx + 1, zy);
+      ctx.closePath();
+      ctx.fill();
 
       ctx.font = '800 11px "JetBrains Mono", monospace';
       ctx.fillStyle = '#ffea00';
@@ -3050,12 +3415,22 @@ function drawLightningCells() {
     ctx.fillRect(x, y, CELL, CELL);
 
     if ((gx + gy) % 2 === 0) {
-      ctx.font = '10px serif';
-      ctx.textAlign = 'center';
-      ctx.globalAlpha = 0.8;
-      ctx.fillText('⚡', cx, cy + 4);
-      ctx.globalAlpha = 1;
-      ctx.textAlign = 'start';
+      ctx.save();
+      ctx.strokeStyle = '#00e5ff';
+      ctx.lineWidth = 1.8;
+      ctx.shadowColor = '#00e5ff';
+      ctx.shadowBlur = 8;
+      ctx.beginPath();
+      ctx.moveTo(cx - 4, cy - 5);
+      ctx.lineTo(cx + (Math.sin(time * 5 + gx) * 3), cy - 1);
+      ctx.lineTo(cx - (Math.sin(time * 6 + gy) * 3), cy + 2);
+      ctx.lineTo(cx + 4, cy + 6);
+      ctx.stroke();
+
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 0.8;
+      ctx.stroke();
+      ctx.restore();
     }
   }
 }
@@ -3086,14 +3461,60 @@ function drawBombs() {
 
     const bombPulse = 1 + Math.sin(b.stateTime * (0.005 + urgency * 0.02)) * 0.15 * (1 + urgency);
 
-    ctx.shadowColor = `rgba(255, 23, 68, ${0.4 + urgency * 0.6})`;
-    ctx.shadowBlur = 10 + urgency * 18;
-    ctx.font = `${17 + bombPulse * 2}px serif`;
-    ctx.textAlign = 'center';
-    ctx.fillText('💣', x, y + 6);
-    ctx.textAlign = 'start';
-    ctx.shadowColor = 'transparent';
-    ctx.shadowBlur = 0;
+    ctx.save();
+    ctx.shadowColor = urgency > 0.6 ? '#ff1744' : '#ff9100';
+    ctx.shadowBlur = 12 + urgency * 18;
+
+    const baseR = (CELL * 0.38) * bombPulse;
+
+    // Outer bomb casing (dark titanium sphere)
+    const bombGrd = ctx.createRadialGradient(x - baseR * 0.35, y - baseR * 0.35, 1, x, y, baseR);
+    bombGrd.addColorStop(0, '#475569');
+    bombGrd.addColorStop(0.5, '#1e293b');
+    bombGrd.addColorStop(1, '#090d16');
+    ctx.fillStyle = bombGrd;
+    ctx.beginPath();
+    ctx.arc(x, y + 1, baseR, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Warning hazard ring
+    ctx.strokeStyle = urgency > 0.6 ? `rgba(255, 23, 68, ${0.6 + Math.sin(b.stateTime * 0.03) * 0.4})` : 'rgba(255, 234, 0, 0.6)';
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.arc(x, y + 1, baseR * 0.72, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Detonator cap neck
+    ctx.fillStyle = '#64748b';
+    ctx.fillRect(x - 2.5, y - baseR - 3, 5, 4);
+
+    // Glowing fuse wire & dynamic sparks
+    const fuseSway = Math.sin(b.stateTime * 0.02) * 3;
+    ctx.strokeStyle = '#f59e0b';
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.moveTo(x, y - baseR - 3);
+    ctx.quadraticCurveTo(x + fuseSway, y - baseR - 7, x + 4 + fuseSway, y - baseR - 9);
+    ctx.stroke();
+
+    // Sizzling spark at wick tip
+    const sparkX = x + 4 + fuseSway;
+    const sparkY = y - baseR - 9;
+    const sparkColor = urgency > 0.7 ? '#ff1744' : '#ffea00';
+    ctx.fillStyle = sparkColor;
+    ctx.shadowColor = sparkColor;
+    ctx.shadowBlur = 10;
+    ctx.beginPath();
+    ctx.arc(sparkX, sparkY, 2.5 + Math.random() * 2, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Core pulsing LED dot
+    ctx.fillStyle = urgency > 0.5 ? (Math.floor(b.stateTime / 120) % 2 === 0 ? '#ff1744' : '#fff') : '#ffea00';
+    ctx.beginPath();
+    ctx.arc(x, y + 1, 2.2, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
 
     const secsLeft = Math.max(0, (b.fuseTime - b.stateTime) / 1000).toFixed(1);
     ctx.fillStyle = secsLeft <= 1.5 ? '#ff1744' : '#ffea00';
@@ -3156,15 +3577,30 @@ function drawParticles() {
 }
 
 function drawPauseOverlay() {
-  ctx.fillStyle = 'rgba(5,10,20,.6)';
+  ctx.fillStyle = 'rgba(5, 10, 20, 0.75)';
   ctx.fillRect(0, 0, CANVAS_PX, CANVAS_PX);
+
+  ctx.save();
+  ctx.fillStyle = '#38bdf8';
+  ctx.shadowColor = '#38bdf8';
+  ctx.shadowBlur = 14;
+  const barW = 8;
+  const barH = 26;
+  const cx = CANVAS_PX / 2;
+  const cy = CANVAS_PX / 2 - 20;
+  ctx.beginPath();
+  ctx.roundRect(cx - barW - 4, cy - barH / 2, barW, barH, 3);
+  ctx.roundRect(cx + 4, cy - barH / 2, barW, barH, 3);
+  ctx.fill();
+  ctx.restore();
+
   ctx.fillStyle = '#e8f4fd';
-  ctx.font = '700 28px Orbitron, system-ui';
+  ctx.font = '700 24px Orbitron, system-ui';
   ctx.textAlign = 'center';
-  ctx.fillText('⏸  Tạm dừng', CANVAS_PX / 2, CANVAS_PX / 2);
-  ctx.font = '400 13px Inter, system-ui';
-  ctx.fillStyle = '#78909c';
-  ctx.fillText('Nhấn Space để tiếp tục', CANVAS_PX / 2, CANVAS_PX / 2 + 30);
+  ctx.fillText('TẠM DỪNG', CANVAS_PX / 2, CANVAS_PX / 2 + 18);
+  ctx.font = '500 13px Inter, system-ui';
+  ctx.fillStyle = '#94a3b8';
+  ctx.fillText('Nhấn Space để tiếp tục', CANVAS_PX / 2, CANVAS_PX / 2 + 42);
   ctx.textAlign = 'start';
 }
 
@@ -3214,8 +3650,19 @@ document.addEventListener('keydown', e => {
   const newDir = DIR_MAP[e.key];
   if (newDir && running && !paused && trapFrozenTimer <= 0) {
     e.preventDefault();
+    keysDown.add(e.key);
     nextDir = newDir;
   }
+});
+
+document.addEventListener('keyup', e => {
+  if (DIR_MAP[e.key]) {
+    keysDown.delete(e.key);
+  }
+});
+
+window.addEventListener('blur', () => {
+  keysDown.clear();
 });
 
 // Canvas click to aim & shoot directly with mouse
@@ -3238,7 +3685,11 @@ function changeDir(d) {
     right: { x:  1, y:  0 },
   };
   const nd = map[d];
-  if (nd && running && !paused) nextDir = nd;
+  if (nd && running && !paused) {
+    dir = nd;
+    nextDir = nd;
+    keysDown.clear();
+  }
 }
 
 // Touch swipe & tap to shoot
@@ -3387,13 +3838,19 @@ function updateLobbyUI() {
 
     if (p) {
       card.innerHTML = `
-        <span class="slot-avatar">🏃</span>
+        <span class="slot-avatar">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="7" r="4"/><path d="M5.5 21v-2a4.5 4.5 0 0 1 4.5-4.5h4a4.5 4.5 0 0 1 4.5 4.5v2"/></svg>
+        </span>
         <span class="slot-name">${p.name} ${p.id === myPlayerId ? '(Bạn)' : ''}</span>
-        <span class="slot-role ${p.isHost ? 'host' : 'guest'}">${p.isHost ? '👑 Host' : 'Khách'}</span>
+        <span class="slot-role ${p.isHost ? 'host' : 'guest'}">
+          ${p.isHost ? '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" style="vertical-align:middle;margin-right:4px"><path d="M2 4l3 12h14l3-12-5 4-5-6-5 6z"/></svg>Host' : 'Khách'}
+        </span>
       `;
     } else {
       card.innerHTML = `
-        <span class="slot-avatar" style="opacity:0.3">➕</span>
+        <span class="slot-avatar" style="opacity:0.35">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        </span>
         <span class="slot-name">Vị trí ${i + 1} trống</span>
         <span class="slot-role" style="opacity:0.4">Chờ...</span>
       `;
@@ -3423,10 +3880,18 @@ function updateMultiHud() {
 
       if (p.isAlive) {
         badge.classList.remove('dead');
-        if (iconEl) iconEl.textContent = p.isHost ? '👑' : (p.isFrozen ? '⛓️' : '🏃');
+        if (iconEl) {
+          iconEl.innerHTML = p.isHost 
+            ? '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#ffd700" stroke-width="2.2"><path d="M2 4l3 12h14l3-12-5 4-5-6-5 6z"/></svg>' 
+            : (p.isFrozen 
+              ? '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#67e8f9" stroke-width="2.2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>' 
+              : '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#4ade80" stroke-width="2.2"><circle cx="12" cy="7" r="4"/><path d="M6 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/></svg>');
+        }
       } else {
         badge.classList.add('dead');
-        if (iconEl) iconEl.textContent = '💀';
+        if (iconEl) {
+          iconEl.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#f43f5e" stroke-width="2.2"><circle cx="12" cy="11" r="7"/><path d="M9 18v3h6v-3"/><circle cx="9" cy="10" r="1.5" fill="#f43f5e"/><circle cx="15" cy="10" r="1.5" fill="#f43f5e"/></svg>';
+        }
       }
     } else {
       badge.style.display = 'none';
@@ -3598,7 +4063,7 @@ function handleNetworkMessage(msg) {
     case 'MINE_DEPLOYED': {
       if (!placedMines.some(m => m.id === msg.mine.id)) {
         placedMines.push(msg.mine);
-        if (msg.announcer !== myPlayerName) showToast(`🚨 ${msg.announcer} vừa gài Mìn! Cẩn thận!`);
+        if (msg.announcer !== myPlayerName) showToast(`CẢNH BÁO: ${msg.announcer} vừa gài Mìn Tàng Hình!`);
       }
       break;
     }
@@ -3742,17 +4207,17 @@ function showMultiplayerGameOver(leaderboard) {
   elResRoomCode.textContent = currentRoomCode;
   elLeaderboardList.innerHTML = '';
 
-  const medals = ['🥇', '🥈', '🥉', '💀'];
-
   leaderboard.forEach((p, idx) => {
     const row = document.createElement('div');
     row.className = 'lb-row';
     const isWinner = idx === 0 && p.isAlive;
-    const medal = isWinner ? '🏆' : (medals[idx] || '💀');
+    const rankBadge = isWinner 
+      ? '<span class="lb-badge-winner" style="display:inline-flex;align-items:center;gap:4px;color:#ffd700;font-weight:800"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 9H4a2 2 0 0 1-2-2V5h4m14 4h2a2 2 0 0 0 2-2V5h-4M6 5h12v6a6 6 0 0 1-12 0V5zm4 10v4m4-4v4m-6 0h8"/></svg>#1 TOP</span>'
+      : `<span class="lb-rank" style="font-weight:800;color:${idx === 1 ? '#94a3b8' : idx === 2 ? '#b45309' : '#64748b'}">#${idx + 1}</span>`;
 
     row.innerHTML = `
       <div class="lb-rank-group">
-        <span class="lb-rank">${medal}</span>
+        <span class="lb-rank">${rankBadge}</span>
         <span class="lb-name">${p.name} ${p.id === myPlayerId ? '(Bạn)' : ''}</span>
       </div>
       <div class="lb-stats">
