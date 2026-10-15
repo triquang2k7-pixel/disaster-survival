@@ -1,46 +1,59 @@
-# 🏃‍♂️ Thoát Khỏi Thiên Tai — Disaster Survival Online (4 Players)
+# 🏃‍♂️ Thoát Khỏi Thiên Tai — Disaster Survival Online (v2.0)
 
 Game sinh tồn nhiều người chơi trực tuyến (1-4 người) đối đầu với các thảm họa thiên tai tàn khốc, hỗ trợ chơi qua trình duyệt trên máy tính và điện thoại.
 
-## 🌟 Tính Năng Nổi Bật
+## 🌟 Tính Năng Mới & Nổi Bật (v2.0)
+
+- **🎨 Cửa Hàng Skin Đa Dạng (Skin Shop)**:
+  - 12 bộ trang phục phong cách độc đáo: *Chiến Binh*, *Ninja Bóng Đêm*, *Chiến Binh Lửa*, *Băng Giá*, *Độc Tố Xanh*, *Hoàng Gia*, *Chiến Binh Cyber*, *Bóng Ma*, *Vàng Ròng*, *Cầu Vồng*, *Rồng Thần*, *Kim Cương*.
+  - Nhận ngay **100 Xu khởi đầu** cho người chơi mới.
+  - Kiếm thêm xu bằng cách nhặt đồng xu vàng 🪙 trên sàn đấu và sống sót qua từng giây hiểm họa.
+  - Tự động lưu trang phục và số dư xu vào `localStorage`.
+  - Hiển thị trực tiếp skin đã trang bị lên nhân vật trong cả chế độ Chơi Đơn lẫn Chơi Online nhiều người!
+
+- **🔫 Vũ Khí Súng Laser & Bắn Người Chơi Khác**:
+  - Nhặt biểu tượng Súng 🔫 trên sàn đấu: mỗi lần nhặt cộng **+1 viên đạn**, có thể tích trữ nhiều lần không giới hạn.
+  - **Cách bắn linh hoạt**:
+    - Nhấn phím `3`, phím `F` hoặc phím `J` để bắn theo hướng di chuyển hiện tại.
+    - Hoặc **Click chuột trực tiếp lên màn hình** để ngắm bắn chính xác về phía con trỏ chuột!
+    - Trên điện thoại: Nhấn nút `🔫 Bắn (3)` hoặc chạm nhanh (tap) vào màn hình.
+  - Nhân vật hiển thị súng laser cầm trên tay khi còn đạn.
+  - **Chế độ Chơi Online**: Đạn trúng đối thủ gây **35 HP sát thương**, hiệu ứng cháy nổ và rung giật màn hình chân thực!
+  - **Chế độ Chơi Đơn (Solo)**: Bắn dập tắt ngay các đốm lửa và sóng lửa đang lan rộng, tạo làn khói trắng giải vây!
+
+- **🛡️ Chế Độ Chơi Đơn (Solo) Tinh Gọn — Không Bẫy, Mìn**:
+  - Khi chơi đơn, toàn bộ khe đồ Bẫy 🪤 và Mìn 💣 sẽ được ẩn đi, chỉ hiển thị Máu ❤️ và Súng 🔫.
+  - Không sinh ra bẫy và mìn ngẫu nhiên trên bản đồ để tập trung hoàn toàn vào kỹ năng né tránh thiên tai và bắn súng sinh tồn.
 
 - **🌐 Chơi Online 4 Người Với Mã Phòng (Room Code)**:
   - Tự động tạo mã phòng 4 ký tự viết hoa (ví dụ: `JAKR`, `LUA7`...) với nút 1-click Copy.
-  - Sử dụng công nghệ **WebRTC (PeerJS)** kết nối trực tiếp P2P qua internet, không cần cài đặt backend phức tạp.
-  - Tích hợp **BroadcastChannel** cho phép mở 2-4 tab trên cùng máy tính để test thử ngay lập tức.
-  - Chế độ quan sát (Ghost 👻) khi bị hạ gục và bảng xếp hạng trận đấu (Leaderboard 🏆) từ Hạng 1 đến Hạng 4.
+  - Kết nối P2P thời gian thực bằng **WebRTC (PeerJS)** và **BroadcastChannel**.
+  - Bảng xếp hạng trực quan sau trận đấu, đồng bộ hóa vị trí, trang phục, máu và đạn dược.
 
-- **❤️ Hệ Thống 100 HP & Nhặt Tim Hồi Máu**:
-  - Mỗi người chơi bắt đầu với 100 HP. Thanh máu đổi màu trực quan theo lượng máu còn lại.
-  - Nhặt vật phẩm Trái Tim ❤️ ngẫu nhiên trên sân để hồi phục từ +5 đến +10 HP.
-
-- **🪤 Bẫy Kẹp (Phím 1)**:
-  - Bẫy sắt hiện rõ trên sân (không tàng hình).
-  - Bất kỳ ai bước vào (kể cả người thả nếu quay lại dẫm trúng) sẽ bị kẹp chân bất động 3 giây và mất 15 HP.
-  - Có 1.8 giây đếm ngược an toàn khi gài bẫy để người đặt kịp bước ra ngoài.
-
-- **💣 Mìn Tàng Hình (Phím 2)**:
-  - Khi gài mìn, thông báo phát lên toàn phòng cảnh báo mọi người.
-  - Mìn ẩn mình hoàn toàn 100% đối với đối thủ (người đặt chỉ thấy bóng mờ 25% để né).
-  - Ai dẫm trúng (kể cả người đặt nếu quay lại) sẽ phát nổ rung chuyển màn hình và gây sát thương nổ lan 50 HP cho tất cả người chơi đứng lân cận trong bán kính 2 ô!
+- **🪤 Bẫy Kẹp & 💣 Mìn Tàng Hình (Chế Độ Online)**:
+  - **Bẫy Kẹp (Phím 1)**: Kẹp chân bất động 3 giây và mất 15 HP.
+  - **Mìn Tàng Hình (Phím 2)**: Ẩn mình với đối thủ, phát nổ nổ lan bán kính 2 ô gây 50 HP sát thương.
 
 - **🌪️ Các Hiểm Họa Thiên Tai Đồng Thời**:
-  - **🔥 Núi Lửa (Quét thẳng & Quét chéo)**: Sóng lửa càn quét toàn sân hoặc khoảng cách ngẫu nhiên.
-  - **🔥 Lửa bén lan & Mưa dập lửa**: Đốm lửa bén lan lác đác từ điểm quét, nhưng khi bão sấm chớp đổ mưa hoặc vũng nước tràn tới sẽ dập tắt ngọn lửa thành khói trắng nghi ngút 💨.
-  - **⚡ Bão Sấm Chớp & Vũng Nước Dẫn Điện**: Vũng nước bình thường hoàn toàn an toàn, nhưng khi bị sét đánh trúng sẽ phát sáng nhiễm điện cao thế giật mất máu.
-  - **🌪️ Lốc Xoáy Khổng Lồ**: Tâm bão 3 tầng gió xoáy tự động đổi hướng lượn về phía người chơi.
-  - **🕳️ Sụt Lở Đất (2-4 Vực Sâu)**: Mặt đất sụt lún thành các hố vực tử thần.
-  - **💣 Bom Hẹn Giờ**: Đếm ngược giây phát nổ để lại miệng hố cháy xém.
+  - **🔥 Núi Lửa (Quét thẳng & Quét chéo)**: Sóng lửa càn quét toàn sân.
+  - **🔥 Lửa bén lan & Mưa dập lửa**: Đốm lửa bén lan tự nhiên, bị dập khi gặp mưa sét hoặc đạn súng.
+  - **⚡ Bão Sấm Chớp & Vũng Nước Dẫn Điện**: Vũng nước nhiễm điện cao thế khi bị sét đánh trúng.
+  - **🌪️ Lốc Xoáy Khổng Lồ**: Tâm bão 3 tầng gió xoáy tự lượn về phía người chơi.
+  - **🕳️ Sụt Lở Đất (2-4 Vực Sâu)**: Mặt đất sụt lún thành các hố tử thần.
+  - **💣 Bom Hẹn Giờ**: Đếm ngược giây phát nổ để lại hố cháy xém.
 
-## 🎮 Cách Điều Khiển
+## 🎮 Hướng Dẫn Điều Khiển
 
-- **Di chuyển**: Phím mũi tên hoặc `W`, `A`, `S`, `D` (hoặc phím cảm ứng trên điện thoại).
-- **Thả Bẫy Kẹp**: Nhấn phím `1` (hoặc nút `🪤 Bẫy (1)`).
-- **Gài Mìn Tàng Hình**: Nhấn phím `2` (hoặc nút `💣 Mìn (2)`).
-- **Tạm dừng**: Phím `Space` (trong chế độ Chơi Đơn).
+| Thao tác | Phím máy tính | Cảm ứng điện thoại |
+| :--- | :--- | :--- |
+| **Di chuyển** | Phím mũi tên hoặc `W`, `A`, `S`, `D` | Nút mũi tên hoặc Vuốt (Swipe) |
+| **Bắn súng 🔫** | Phím `3`, phím `F`, phím `J` hoặc **Click chuột ngắm bắn** | Nút `🔫 Bắn (3)` hoặc Chạm (Tap) |
+| **Thả Bẫy 🪤 (Online)** | Phím `1` | Nút `🪤 Bẫy (1)` |
+| **Gài Mìn 💣 (Online)** | Phím `2` | Nút `💣 Mìn (2)` |
+| **Tạm dừng ⏸️** | Phím `Space` (Chơi đơn) | Nhấn nút tạm dừng |
 
-## 🚀 Hướng Dẫn Chạy & Triển Khai
+## 🚀 Hướng Dẫn Chạy Game
 
-Game được viết 100% bằng HTML5, CSS3 và JavaScript thuần, không cần build hay cài thư viện Node.js:
-1. Mở trực tiếp file `index.html` bằng trình duyệt web.
-2. Hoặc tải lên **GitHub Pages** / **Vercel** / **Netlify** để lấy link chơi online miễn phí chia sẻ cho bạn bè.
+Game được phát triển 100% bằng HTML5 Canvas, CSS3 và Vanilla JavaScript thuần, không cần build phức tạp:
+1. Mở file `index.html` trực tiếp trên bất kỳ trình duyệt web hiện đại nào (Chrome, Edge, Firefox, Safari).
+2. Hoặc triển khai lên **GitHub Pages**, **Vercel** hoặc **Netlify** chỉ bằng 1 cú kéo thả thư mục.

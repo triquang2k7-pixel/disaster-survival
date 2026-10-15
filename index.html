@@ -7,7 +7,7 @@
   <meta name="description" content="Game sinh tồn chạy trốn thiên tai: Núi lửa, bão sấm chớp nhiễm điện vũng nước, sụt lở đất và nhặt vật phẩm.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&family=JetBrains+Mono:wght@500;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;800;900&family=Inter:wght@400;600;700;800;900&family=JetBrains+Mono:wght@500;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
   <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 </head>
@@ -15,6 +15,8 @@
   <div class="game-container" id="gameContainer">
     <!-- Background firefly & dust particles -->
     <div class="bg-particles" id="bgParticles"></div>
+    <!-- Animated grid lines bg -->
+    <div class="bg-grid"></div>
 
     <!-- Header -->
     <header class="game-header">
@@ -37,15 +39,19 @@
         </div>
         <div class="score-divider"></div>
         <div class="score-item">
-          <span class="score-label">Kỷ lục điểm</span>
+          <span class="score-label">Kỷ lục</span>
           <span class="score-value best" id="bestScore">0</span>
+        </div>
+        <div class="score-divider"></div>
+        <div class="score-item coins-display">
+          <span class="score-label">Xu</span>
+          <span class="score-value coins" id="coinDisplay">0</span>
         </div>
       </div>
     </header>
 
     <!-- Multiplayer In-Game Player Status HUD (Hidden in Solo) -->
     <div class="multi-hud hidden" id="multiHud">
-      <!-- 4 player status badges generated dynamically -->
       <div class="multi-player-badge p0" id="mpBadge0">
         <span class="mp-icon">🏃</span>
         <span class="mp-name">P1</span>
@@ -68,7 +74,7 @@
       </div>
     </div>
 
-    <!-- Player Status Bar: 100 HP & Inventory (Slots 1 & 2) -->
+    <!-- Player Status Bar: 100 HP & Inventory (Slots 1, 2, 3) -->
     <div class="player-hud" id="playerHud">
       <!-- Health Bar -->
       <div class="hp-box">
@@ -79,7 +85,7 @@
         <span class="hp-text" id="hpText">100/100 HP</span>
       </div>
 
-      <!-- Inventory: Trap (1) & Landmine (2) -->
+      <!-- Inventory: Trap (1), Landmine (2), Gun (3) -->
       <div class="inventory-bar">
         <button class="inv-slot" id="slotTrap" onclick="deployTrap()" title="Nhấn phím 1 để thả Bẫy kẹp">
           <span class="slot-key">1</span>
@@ -91,6 +97,11 @@
           <span class="slot-icon">💣</span>
           <span class="slot-count" id="countMine">x1</span>
         </button>
+        <button class="inv-slot gun-slot" id="slotGun" onclick="shootGun()" title="Nhấn phím 3 hoặc click để bắn (hướng đang nhìn)">
+          <span class="slot-key">3</span>
+          <span class="slot-icon">🔫</span>
+          <span class="slot-count" id="countGun">x0</span>
+        </button>
       </div>
     </div>
 
@@ -99,7 +110,7 @@
       <span class="toast-text" id="toastText"></span>
     </div>
 
-    <!-- Hazard warning banner (Positioned at top so it never obstructs the playing canvas) -->
+    <!-- Hazard warning banner -->
     <div class="hazard-warning hidden" id="hazardWarning">
       <span class="hazard-warn-text" id="hazardWarnText"></span>
     </div>
@@ -110,14 +121,17 @@
 
       <!-- Overlay: Start -->
       <div class="overlay" id="overlayStart">
-        <div class="overlay-content">
-          <div class="overlay-icon">🏃‍♂️</div>
-          <h1 class="overlay-title">Thoát Khỏi Thiên Tai</h1>
-          <p class="overlay-sub">Sinh tồn 100 HP: Lốc xoáy, núi lửa đốt cỏ lan rộng, sấm chớp nhiễm điện vũng nước! Nhặt tim ❤️ hồi máu, thả Bẫy 🪤 làm bất động và Mìn tàng hình 💣 nổ lan!</p>
+        <div class="overlay-content start-screen">
+          <div class="start-hero">
+            <div class="overlay-icon">🏃‍♂️</div>
+            <h1 class="overlay-title">Thoát Khỏi Thiên Tai</h1>
+            <p class="overlay-sub">Sinh tồn 100 HP: Lốc xoáy, núi lửa đốt cỏ lan rộng, sấm chớp nhiễm điện vũng nước!<br>Nhặt ❤️ hồi máu, 🔫 bắn người chơi khác, thả Bẫy 🪤 và Mìn 💣!</p>
+          </div>
           <div class="hazard-info">
-            <span class="hazard-tag heart">❤️ Tim hồi máu (5-10 HP)</span>
-            <span class="hazard-tag trap">🪤 Bẫy bất động (Phím 1)</span>
-            <span class="hazard-tag landmine">💣 Mìn tàng hình (Phím 2)</span>
+            <span class="hazard-tag heart">❤️ Tim hồi máu</span>
+            <span class="hazard-tag gun-tag">🔫 Súng (1 đạn, tích được)</span>
+            <span class="hazard-tag trap">🪤 Bẫy (Chỉ Online)</span>
+            <span class="hazard-tag landmine">💣 Mìn (Chỉ Online)</span>
             <span class="hazard-tag tornado">🌪️ Lốc xoáy</span>
             <span class="hazard-tag fire">🔥 Lửa lan rộng</span>
             <span class="hazard-tag thunder">⚡ Sấm chớp & Nước</span>
@@ -126,11 +140,14 @@
 
           <!-- Mode Select Buttons -->
           <div class="start-actions">
-            <button class="btn-play primary" id="btnStart" onclick="startSoloGame()">
+            <button class="btn-play primary glow-btn" id="btnStart" onclick="startSoloGame()">
               <span>▶</span> Chơi Đơn (Solo)
             </button>
-            <button class="btn-play secondary" id="btnOpenOnline" onclick="openOnlineModal()">
+            <button class="btn-play secondary glow-btn" id="btnOpenOnline" onclick="openOnlineModal()">
               <span>🌐</span> Chơi Online (4 Người)
+            </button>
+            <button class="btn-play skin-btn glow-btn" id="btnOpenSkinShop" onclick="openSkinShop()">
+              <span>🎨</span> Cửa Hàng Skin
             </button>
           </div>
 
@@ -140,6 +157,27 @@
             <button class="diff-btn" data-speed="normal" onclick="setSpeed('normal')">Nhanh</button>
             <button class="diff-btn" data-speed="fast" onclick="setSpeed('fast')">Siêu tốc</button>
           </div>
+        </div>
+      </div>
+
+      <!-- Overlay: Skin Shop -->
+      <div class="overlay hidden" id="overlaySkinShop">
+        <div class="overlay-content skin-shop-content">
+          <div class="skin-shop-header">
+            <h2 class="overlay-title">🎨 Cửa Hàng Skin</h2>
+            <p class="overlay-sub">Chọn trang phục cho nhân vật của bạn! Kiếm xu bằng cách sinh tồn.</p>
+            <div class="shop-coins-bar">
+              <span class="shop-coin-icon">🪙</span>
+              <span class="shop-coin-value" id="shopCoinDisplay">0</span>
+              <span class="shop-coin-label">Xu</span>
+            </div>
+          </div>
+          <div class="skin-grid" id="skinGrid">
+            <!-- Generated via JS -->
+          </div>
+          <button class="btn-back glow-btn" onclick="closeSkinShop()">
+            <span>⬅</span> Quay lại
+          </button>
         </div>
       </div>
 
@@ -157,7 +195,7 @@
               <input type="text" id="onlinePlayerName" class="form-input" maxlength="12" placeholder="Nhập tên của bạn..." value="Chiến Binh">
 
               <div class="online-buttons-grid">
-                <button class="btn-online host" onclick="createOnlineRoom()">
+                <button class="btn-online host glow-btn" onclick="createOnlineRoom()">
                   <span>👑</span> Tạo phòng mới (Host)
                 </button>
               </div>
@@ -166,7 +204,7 @@
 
               <div class="join-row">
                 <input type="text" id="inputRoomCode" class="form-input code-input" maxlength="6" placeholder="Mã phòng..." uppercase>
-                <button class="btn-online join" onclick="joinOnlineRoom()">
+                <button class="btn-online join glow-btn" onclick="joinOnlineRoom()">
                   <span>🔑</span> Vào phòng
                 </button>
               </div>
@@ -196,7 +234,7 @@
             </div>
 
             <div class="lobby-actions">
-              <button class="btn-play primary hidden" id="btnStartMultiGame" onclick="hostStartMatch()">
+              <button class="btn-play primary glow-btn hidden" id="btnStartMultiGame" onclick="hostStartMatch()">
                 <span>🚀</span> Bắt đầu trận đấu
               </button>
               <div class="guest-waiting-msg hidden" id="guestWaitingMsg">
@@ -220,13 +258,26 @@
 
       <!-- Overlay: Game Over (Solo) -->
       <div class="overlay hidden" id="overlayGameOver">
-        <div class="overlay-content">
+        <div class="overlay-content gameover-screen">
           <div class="overlay-icon gameover">💀</div>
-          <h1 class="overlay-title">Bị Thiên Tai Nuốt Chửng!</h1>
-          <p class="overlay-sub">Điểm sinh tồn: <strong id="finalScore">0</strong> điểm (<span id="finalTime">0.0s</span>)</p>
+          <h1 class="overlay-title gameover-title">Bị Thiên Tai Nuốt Chửng!</h1>
+          <div class="gameover-stats">
+            <div class="go-stat">
+              <span class="go-stat-label">Điểm sinh tồn</span>
+              <span class="go-stat-value" id="finalScore">0</span>
+            </div>
+            <div class="go-stat">
+              <span class="go-stat-label">Thời gian</span>
+              <span class="go-stat-value time-val" id="finalTime">0.0s</span>
+            </div>
+            <div class="go-stat">
+              <span class="go-stat-label">Xu kiếm được</span>
+              <span class="go-stat-value coins-val" id="finalCoins">+0</span>
+            </div>
+          </div>
           <p class="overlay-reason" id="deathReason">Bạn đã bị thiên tai đánh bại!</p>
           <p class="overlay-record hidden" id="newRecord">🏆 Kỷ lục điểm mới!</p>
-          <button class="btn-play" onclick="startSoloGame()">
+          <button class="btn-play glow-btn" onclick="startSoloGame()">
             <span>🔄</span> Chạy lại lần nữa
           </button>
         </div>
@@ -244,7 +295,7 @@
           </div>
 
           <div class="multi-go-actions">
-            <button class="btn-play primary hidden" id="btnHostPlayAgain" onclick="hostRestartMatch()">
+            <button class="btn-play primary glow-btn hidden" id="btnHostPlayAgain" onclick="hostRestartMatch()">
               <span>🔄</span> Chơi ván mới
             </button>
             <button class="btn-back" onclick="returnToLobby()">
@@ -260,6 +311,7 @@
       <div class="ctrl-row actions-row">
         <button class="ctrl-btn-action trap" onclick="deployTrap()">🪤 Bẫy (1)</button>
         <button class="ctrl-btn-action mine" onclick="deployMine()">💣 Mìn (2)</button>
+        <button class="ctrl-btn-action gun-mobile" onclick="shootGun()">🔫 Bắn (3)</button>
       </div>
       <div class="ctrl-row">
         <button class="ctrl-btn" onclick="changeDir('up')">▲</button>
@@ -273,7 +325,7 @@
 
     <!-- Footer -->
     <footer class="game-footer">
-      <span><kbd>WASD</kbd> di chuyển · <kbd>1</kbd> Thả Bẫy · <kbd>2</kbd> Thả Mìn · <kbd>Space</kbd> tạm dừng</span>
+      <span><kbd>WASD</kbd> di chuyển · <kbd>3</kbd>/<kbd>F</kbd>/Click Bắn súng 🔫 · <kbd>1</kbd>/<kbd>2</kbd> Bẫy & Mìn (Online) · <kbd>Space</kbd> tạm dừng</span>
       <span class="pause-indicator hidden" id="pauseIndicator">⏸ Đã tạm dừng</span>
     </footer>
   </div>
