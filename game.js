@@ -692,12 +692,19 @@ function updateInventoryUI() {
   if (elCountMine) elCountMine.textContent = 'x' + mineCount;
   if (elCountGun) elCountGun.textContent = 'x' + gunAmmo;
 
+  const mobCountTrap = document.getElementById('mobileCountTrap');
+  const mobCountMine = document.getElementById('mobileCountMine');
+  const mobCountGun = document.getElementById('mobileCountGun');
+  if (mobCountTrap) mobCountTrap.textContent = 'x' + trapCount;
+  if (mobCountMine) mobCountMine.textContent = 'x' + mineCount;
+  if (mobCountGun) mobCountGun.textContent = 'x' + gunAmmo;
+
   // In Solo mode: hide traps and mines slots completely!
   if (elSlotTrap) elSlotTrap.classList.toggle('hidden', !isMultiplayer);
   if (elSlotMine) elSlotMine.classList.toggle('hidden', !isMultiplayer);
 
-  const mobileTrap = document.querySelector('.ctrl-btn-action.trap');
-  const mobileMine = document.querySelector('.ctrl-btn-action.mine');
+  const mobileTrap = document.getElementById('mobileBtnTrap');
+  const mobileMine = document.getElementById('mobileBtnMine');
   if (mobileTrap) mobileTrap.classList.toggle('hidden', !isMultiplayer);
   if (mobileMine) mobileMine.classList.toggle('hidden', !isMultiplayer);
 }
@@ -839,7 +846,14 @@ function shootGun(targetX, targetY) {
     vy = (dy / len) * GUN_BULLET_SPEED;
   } else {
     const bDir = { x: dir.x, y: dir.y };
-    if (bDir.x === 0 && bDir.y === 0) bDir.x = 1; // fallback
+    if (bDir.x === 0 && bDir.y === 0) {
+      if (player && typeof player.angle === 'number') {
+        bDir.x = Math.cos(player.angle);
+        bDir.y = Math.sin(player.angle);
+      } else {
+        bDir.x = 1;
+      }
+    }
     vx = bDir.x * GUN_BULLET_SPEED;
     vy = bDir.y * GUN_BULLET_SPEED;
   }
@@ -3846,11 +3860,7 @@ document.addEventListener('keydown', e => {
 
   if (e.key === ' ' || e.key === 'Spacebar') {
     e.preventDefault();
-    if (running && !isMultiplayer) {
-      paused = !paused;
-      elPause.classList.toggle('hidden', !paused);
-      if (!paused) { lastTime = performance.now(); accumulator = 0; }
-    }
+    togglePause();
     return;
   }
 
@@ -3915,6 +3925,14 @@ canvas.addEventListener('click', e => {
   shootGun(clickX, clickY);
 });
 
+function togglePause() {
+  if (!running || isMultiplayer) return;
+  paused = !paused;
+  if (elPause) elPause.classList.toggle('hidden', !paused);
+  if (!paused) { lastTime = performance.now(); accumulator = 0; }
+}
+window.togglePause = togglePause;
+
 function changeDir(d) {
   if (trapFrozenTimer > 0) return;
   const map = {
@@ -3930,6 +3948,7 @@ function changeDir(d) {
     keysDown.clear();
   }
 }
+window.changeDir = changeDir;
 
 // Touch swipe & tap to shoot
 let touchStartX = 0, touchStartY = 0;
@@ -3957,6 +3976,123 @@ canvas.addEventListener('touchend', e => {
   if (absDx > absDy) changeDir(dx > 0 ? 'right' : 'left');
   else changeDir(dy > 0 ? 'down' : 'up');
 }, { passive: true });
+
+// ══════════════════════════════════════════════
+//  MOBILE VIRTUAL JOYSTICK (Điều khiển nút tròn 360°)
+// ══════════════════════════════════════════════
+let joystickActive = false;
+let joystickTouchId = null;
+let joystickCenter = { x: 0, y: 0 };
+let joystickRadius = 36;
+
+function initVirtualJoystick() {
+  const base = document.getElementById('joystickBase');
+  const knob = document.getElementById('joystickKnob');
+  if (!base || !knob) return;
+
+  function updateKnobFromCoord(clientX, clientY) {
+    const dx = clientX - joystickCenter.x;
+    const dy = clientY - joystickCenter.y;
+    const dist = Math.hypot(dx, dy);
+    const clampedDist = Math.min(dist, joystickRadius);
+    let nx = 0, ny = 0;
+    if (dist > 0) {
+      nx = dx / dist;
+      ny = dy / dist;
+    }
+    const kx = nx * clampedDist;
+    const ky = ny * clampedDist;
+    knob.style.transform = `translate(${kx}px, ${ky}px)`;
+
+    if (dist > 6) { // Deadzone of 6px
+      if (trapFrozenTimer <= 0 && running && !paused) {
+        dir.x = nx;
+        dir.y = ny;
+        nextDir.x = nx;
+        nextDir.y = ny;
+        keysDown.clear();
+      }
+    }
+  }
+
+  function handleTouchStart(e) {
+    if (joystickActive) return;
+    const touch = e.changedTouches ? e.changedTouches[0] : e;
+    joystickActive = true;
+    joystickTouchId = (touch.identifier !== undefined) ? touch.identifier : 'mouse';
+    const rect = base.getBoundingClientRect();
+    joystickCenter = {
+      x: rect.left + rect.width / 2,
+      y: rect.top + rect.height / 2
+    };
+    joystickRadius = Math.max(26, (rect.width / 2) - 10);
+    base.classList.add('active');
+    knob.style.transition = 'none';
+    updateKnobFromCoord(touch.clientX, touch.clientY);
+  }
+
+  function handleTouchMove(e) {
+    if (!joystickActive) return;
+    let touch = null;
+    if (e.changedTouches) {
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        if (e.changedTouches[i].identifier === joystickTouchId) {
+          touch = e.changedTouches[i];
+          break;
+        }
+      }
+    } else if (joystickTouchId === 'mouse') {
+      touch = e;
+    }
+    if (!touch) return;
+    if (e.cancelable) e.preventDefault();
+    updateKnobFromCoord(touch.clientX, touch.clientY);
+  }
+
+  function handleTouchEnd(e) {
+    if (!joystickActive) return;
+    let matches = false;
+    if (e.changedTouches) {
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        if (e.changedTouches[i].identifier === joystickTouchId) {
+          matches = true;
+          break;
+        }
+      }
+    } else if (joystickTouchId === 'mouse') {
+      matches = true;
+    }
+    if (!matches) return;
+
+    joystickActive = false;
+    joystickTouchId = null;
+    base.classList.remove('active');
+    knob.style.transition = 'transform 0.16s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+    knob.style.transform = 'translate(0px, 0px)';
+    
+    // Stop moving when finger is lifted from joystick
+    dir.x = 0;
+    dir.y = 0;
+    nextDir.x = 0;
+    nextDir.y = 0;
+  }
+
+  // Multi-touch listeners
+  base.addEventListener('touchstart', handleTouchStart, { passive: false });
+  window.addEventListener('touchmove', handleTouchMove, { passive: false });
+  window.addEventListener('touchend', handleTouchEnd, { passive: false });
+  window.addEventListener('touchcancel', handleTouchEnd, { passive: false });
+
+  // Mouse fallback for desktop testing
+  base.addEventListener('mousedown', handleTouchStart);
+  window.addEventListener('mousemove', e => {
+    if (joystickActive && joystickTouchId === 'mouse') handleTouchMove(e);
+  });
+  window.addEventListener('mouseup', e => {
+    if (joystickActive && joystickTouchId === 'mouse') handleTouchEnd(e);
+  });
+}
+initVirtualJoystick();
 
 // ══════════════════════════════════════════════
 //  ONLINE MULTIPLAYER SYSTEM (4 PLAYERS)

@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;800;900&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=2.4.1">
+  <link rel="stylesheet" href="style.css?v=2.5.0">
   <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 </head>
 <body>
@@ -428,36 +428,56 @@
       </div>
     </div>
 
-    <!-- Mobile controls -->
+    <!-- Mobile controls (Touch Joystick & Circular Action Buttons) -->
     <div class="mobile-controls" id="mobileControls">
-      <div class="ctrl-row actions-row">
-        <button class="ctrl-btn-action trap" onclick="deployTrap()">
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#ffea00" stroke-width="2"><path d="M4 19h16M6 19V9l6 7 6-7v10"/></svg>
-          Bẫy (1)
+      <!-- Left: Circular 360° Joystick -->
+      <div class="joystick-container">
+        <div class="joystick-base" id="joystickBase" title="Kéo để di chuyển 360° tự do">
+          <div class="joy-dir-arrow joy-up" onclick="changeDir('up')">▲</div>
+          <div class="joy-dir-arrow joy-right" onclick="changeDir('right')">▶</div>
+          <div class="joy-dir-arrow joy-down" onclick="changeDir('down')">▼</div>
+          <div class="joy-dir-arrow joy-left" onclick="changeDir('left')">◀</div>
+          <div class="joystick-ring"></div>
+          <div class="joystick-knob" id="joystickKnob">
+            <div class="knob-inner-core"></div>
+          </div>
+        </div>
+        <span class="ctrl-hint-text">XOAY 360°</span>
+      </div>
+
+      <!-- Center Utility: Pause / Exit circular buttons -->
+      <div class="mobile-util-dock">
+        <button class="circle-util-btn" id="mobileBtnPause" onclick="togglePause()" title="Tạm dừng">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1.5"/><rect x="14" y="5" width="4" height="14" rx="1.5"/></svg>
+          <span>Dừng</span>
         </button>
-        <button class="ctrl-btn-action mine" onclick="deployMine()">
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#ff5252" stroke-width="2"><rect x="3" y="11" width="18" height="7" rx="3.5"/><circle cx="12" cy="6" r="2"/></svg>
-          Mìn (2)
-        </button>
-        <button class="ctrl-btn-action gun-mobile" onclick="shootGun()">
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#ff9100" stroke-width="2"><path d="M3 11h11l3-3h3v5h-2l-1 2h-4v4h-3v-4H3z"/></svg>
-          Bắn (3)
+        <button class="circle-util-btn exit" id="mobileBtnExit" onclick="exitToMainMenu()" title="Thoát game">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+          <span>Thoát</span>
         </button>
       </div>
-      <div class="ctrl-row">
-        <button class="ctrl-btn" onclick="changeDir('up')">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><polygon points="12,5 4,17 20,17"/></svg>
-        </button>
-      </div>
-      <div class="ctrl-row">
-        <button class="ctrl-btn" onclick="changeDir('left')">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><polygon points="5,12 17,4 17,20"/></svg>
-        </button>
-        <button class="ctrl-btn" onclick="changeDir('down')">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><polygon points="12,19 4,7 20,7"/></svg>
-        </button>
-        <button class="ctrl-btn" onclick="changeDir('right')">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><polygon points="19,12 7,4 7,20"/></svg>
+
+      <!-- Right: Circular Action Buttons -->
+      <div class="actions-dock" id="actionsDock">
+        <div class="secondary-actions-row">
+          <!-- Bẫy Circle -->
+          <button class="circle-btn trap-btn" id="mobileBtnTrap" onclick="deployTrap()" title="Đặt Bẫy kẹp">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#ffea00" stroke-width="2.2"><path d="M4 19h16M6 19V9l6 7 6-7v10"/><circle cx="12" cy="15" r="1.5" fill="#ffea00"/></svg>
+            <span class="circle-badge yellow-badge" id="mobileCountTrap">x1</span>
+            <span class="btn-subtext">Bẫy</span>
+          </button>
+          <!-- Mìn Circle -->
+          <button class="circle-btn mine-btn" id="mobileBtnMine" onclick="deployMine()" title="Đặt Mìn nổ">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#ff5252" stroke-width="2.2"><rect x="3" y="11" width="18" height="7" rx="3.5" fill="rgba(255,82,82,0.25)"/><circle cx="12" cy="6" r="2" fill="#ff1744"/><line x1="12" y1="8" x2="12" y2="11"/></svg>
+            <span class="circle-badge red-badge" id="mobileCountMine">x1</span>
+            <span class="btn-subtext">Mìn</span>
+          </button>
+        </div>
+        <!-- Bắn Main Circle Button -->
+        <button class="circle-btn shoot-btn" id="mobileBtnShoot" onclick="shootGun()" title="Bắn súng">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#ff9100" stroke-width="2.2"><path d="M3 11h11l3-3h3v5h-2l-1 2h-4v4h-3v-4H3z" fill="rgba(255,145,0,0.3)"/><circle cx="18" cy="10" r="1.5" fill="#fff"/></svg>
+          <span class="circle-badge orange-badge" id="mobileCountGun">x0</span>
+          <span class="btn-subtext main-label">BẮN</span>
         </button>
       </div>
     </div>
@@ -469,6 +489,6 @@
     </footer>
   </div>
 
-  <script src="game.js?v=2.4.1"></script>
+  <script src="game.js?v=2.5.0"></script>
 </body>
 </html>
