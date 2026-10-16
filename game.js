@@ -242,7 +242,9 @@ let landslideTimer = 14000;
 
 let bombs = [];
 let craters = [];
+let shockwaves = [];
 let bombTimer = 6000;
+let tornadoSlowTimer = 0;
 
 // ── Multiplayer State ─────────────────────────
 let isMultiplayer = false;
@@ -280,22 +282,24 @@ const lawnDecorations = [];
   }
 })();
 
-// ── Background firefly particles ──────────────
+// ── Background firefly particles (Optimized for 60 FPS) ──────────
 (function initBgParticles() {
   const container = document.getElementById('bgParticles');
   if (!container) return;
-  const colors = ['#00e5ff', '#7c4dff', '#00e676', '#ffea00', '#ff1744'];
-  for (let i = 0; i < 30; i++) {
+  const colors = ['#00e5ff', '#7c4dff', '#00e676', '#ffea00'];
+  // Keep particle count light to avoid CPU compositing bottle-necks
+  for (let i = 0; i < 8; i++) {
     const p = document.createElement('div');
     p.className = 'particle';
-    const sz = 2 + Math.random() * 3;
+    const sz = 2 + Math.random() * 2;
     p.style.cssText = `
       width:${sz}px;height:${sz}px;
       left:${Math.random()*100}%;
       background:${colors[i%colors.length]};
-      box-shadow: 0 0 8px ${colors[i%colors.length]};
-      animation-duration:${8+Math.random()*14}s;
-      animation-delay:${-Math.random()*20}s;
+      animation-duration:${10+Math.random()*12}s;
+      animation-delay:${-Math.random()*15}s;
+      will-change: transform;
+      transform: translate3d(0, 0, 0);
     `;
     container.appendChild(p);
   }
@@ -541,7 +545,9 @@ function startGame() {
 
   bombs           = [];
   craters         = [];
+  shockwaves      = [];
   bombTimer       = 5500;
+  tornadoSlowTimer = 0;
 
   hideWarning();
 
@@ -1173,9 +1179,9 @@ function collectItem(it) {
   bonusScore += 50;
 
   if (it.type === 'heart') {
-    const healAmount = 5 + Math.floor(Math.random() * 6);
+    const healAmount = 30 + Math.floor(Math.random() * 21); // 30 đến 50 HP
     healHp(healAmount);
-    spawnPickupParticles(it.x, it.y, '#ff5252');
+    spawnPickupParticles(it.x, it.y, '#00e676');
   } else if (it.type === 'trap') {
     trapCount = Math.min(3, trapCount + 1);
     updateInventoryUI();
@@ -1998,12 +2004,45 @@ function explodeBomb(bomb) {
   bomb.state = 'exploding';
   bomb.stateTime = 0;
 
+  const bx = bomb.x + 0.5;
+  const by = bomb.y + 0.5;
+
+  // 1. Instant explosive blast damage & knockback (Real explosion, NOT fire!)
+  if (!isSpectator && running) {
+    const pDist = Math.hypot(player.x - bx, player.y - by);
+    if (pDist <= BOMB_BLAST_RADIUS) {
+      const blastDamage = Math.round(55 - pDist * 8);
+      takeDamage(blastDamage, 'Bị nổ tung bởi sóng xung kích quả bom!');
+      spawnFloatingText(`NỔ BOM! (-${blastDamage} HP)`, player.x, player.y, '#ff1744');
+
+      if (pDist > 0.05) {
+        const knockAngle = Math.atan2(player.y - by, player.x - bx);
+        const knockDist = (BOMB_BLAST_RADIUS - pDist + 0.5) * 1.05;
+        player.x += Math.cos(knockAngle) * knockDist;
+        player.y += Math.sin(knockAngle) * knockDist;
+        player.x = (player.x + GRID) % GRID;
+        player.y = (player.y + GRID) % GRID;
+      }
+    }
+  }
+
+  // 2. High-speed visual shockwave ring
+  shockwaves.push({
+    x: bx * CELL,
+    y: by * CELL,
+    r: 6,
+    maxR: BOMB_BLAST_RADIUS * CELL,
+    life: 380,
+    maxLife: 380,
+  });
+
+  // 3. Scorched charred crater (not fire, purely scorched blast earth)
   const cells = [];
   for (let dx = -BOMB_BLAST_RADIUS; dx <= BOMB_BLAST_RADIUS; dx++) {
     for (let dy = -BOMB_BLAST_RADIUS; dy <= BOMB_BLAST_RADIUS; dy++) {
-      if (dx * dx + dy * dy <= BOMB_BLAST_RADIUS * BOMB_BLAST_RADIUS + 1) {
-        const cx = bomb.x + dx;
-        const cy = bomb.y + dy;
+      if (dx * dx + dy * dy <= BOMB_BLAST_RADIUS * BOMB_BLAST_RADIUS + 0.5) {
+        const cx = Math.floor(bomb.x + dx);
+        const cy = Math.floor(bomb.y + dy);
         if (cx >= 0 && cx < GRID && cy >= 0 && cy < GRID) cells.push({ x: cx, y: cy });
       }
     }
@@ -2013,24 +2052,24 @@ function explodeBomb(bomb) {
   spawnExplosionParticles(bomb.x, bomb.y);
 
   wrapper.classList.add('shake');
-  setTimeout(() => wrapper.classList.remove('shake'), 300);
+  setTimeout(() => wrapper.classList.remove('shake'), 320);
 }
 
 function spawnExplosionParticles(gx, gy) {
   const cx = gx * CELL + CELL / 2;
   const cy = gy * CELL + CELL / 2;
-  const colors = ['#ff1744', '#ff6e40', '#ffab40', '#fff'];
-  for (let i = 0; i < 28; i++) {
+  const colors = ['#f8fafc', '#ffea00', '#ff9100', '#ff1744', '#475569', '#1e293b'];
+  for (let i = 0; i < 26; i++) {
     const angle = Math.random() * Math.PI * 2;
-    const speed = 2 + Math.random() * 4;
+    const speed = 2.5 + Math.random() * 5;
     particles.push({
       x: cx, y: cy,
       vx: Math.cos(angle) * speed,
       vy: Math.sin(angle) * speed,
-      size: 3 + Math.random() * 4,
+      size: 3 + Math.random() * 3.5,
       color: colors[Math.floor(Math.random() * colors.length)],
-      life: 500 + Math.random() * 400,
-      maxLife: 900,
+      life: 380 + Math.random() * 300,
+      maxLife: 680,
     });
   }
 }
@@ -2095,10 +2134,11 @@ function hideWarning() {
   elWarn.classList.add('hidden');
 }
 
-// ── Game loop ─────────────────────────────────
+// ── Game loop (Optimized 60 FPS) ─────────────
 function loop(now) {
   loopId = requestAnimationFrame(loop);
-  const dt = now - lastTime;
+  // Clamp delta time to max 40ms to guarantee solid 60 FPS and avoid physics lag-spikes
+  const dt = Math.min(now - lastTime, 40);
   lastTime = now;
 
   if (!running || paused) { draw(); return; }
@@ -2121,8 +2161,19 @@ function loop(now) {
   elScore.textContent = currentPts;
   if (elTimeDisplay) elTimeDisplay.textContent = survivalTime.toFixed(1) + 's';
 
-  particles = particles.filter(p => { p.life -= dt; return p.life > 0; });
-  trail = trail.filter(t => { t.alpha -= dt * 0.003; return t.alpha > 0; });
+  // In-place updates without garbage collector allocation lag
+  for (let i = particles.length - 1; i >= 0; i--) {
+    particles[i].life -= dt;
+    if (particles[i].life <= 0) particles.splice(i, 1);
+  }
+  for (let i = trail.length - 1; i >= 0; i--) {
+    trail[i].alpha -= dt * 0.003;
+    if (trail[i].alpha <= 0) trail.splice(i, 1);
+  }
+  for (let i = shockwaves.length - 1; i >= 0; i--) {
+    shockwaves[i].life -= dt;
+    if (shockwaves[i].life <= 0) shockwaves.splice(i, 1);
+  }
 
   updateItems(dt);
   updateBullets(dt);
@@ -2135,7 +2186,6 @@ function loop(now) {
 
   updateWarningBanners();
 
-  // "tui muốn di chuyển không phải khối ô nữa"
   // Smooth, continuous movement updated every frame
   updateMovement(dt);
   if (!running) return;
@@ -2183,7 +2233,11 @@ function updateMovement(dt) {
   // Smooth speeds in grid cells per second
   const speedTable = { slow: 4.8, normal: 6.4, fast: 8.2 };
   const cellSpeed = speedTable[currentSpeed] || 6.4;
-  const dist = cellSpeed * (dt / 1000);
+
+  // Apply tornado slow penalty if caught in vortex
+  if (tornadoSlowTimer > 0) tornadoSlowTimer -= dt;
+  const speedMult = tornadoSlowTimer > 0 ? 0.48 : 1.0;
+  const dist = cellSpeed * speedMult * (dt / 1000);
 
   // Update floating-point position
   player.x += dir.x * dist;
@@ -2279,16 +2333,7 @@ function checkHazardDamage(dt) {
     burnDuration = Math.max(burnDuration, 2400);
   }
 
-  for (const c of craters) {
-    for (const cell of c.cells) {
-      const ccx = cell.x * CELL + CELL / 2;
-      const ccy = cell.y * CELL + CELL / 2;
-      if (Math.hypot(px - ccx, py - ccy) < CELL * 0.65) {
-        burnDuration = Math.max(burnDuration, 1600);
-        break;
-      }
-    }
-  }
+  // Note: Craters are scorched earth blast marks from bombs, NOT fire!
 
   if (burnDuration > 0) {
     burnDuration -= dt;
@@ -2339,18 +2384,35 @@ function checkHazardDamage(dt) {
     }
   }
 
+  // Tornado: "giật người chơi khi chạm vào và đi chậm"
   let inVortex = false;
   for (const t of tornadoes) {
     if (t.state === 'active') {
-      const dist = Math.hypot(px - t.x, py - t.y);
-      if (dist < CELL * 1.6) {
+      const dx = px - t.x;
+      const dy = py - t.y;
+      const dist = Math.hypot(dx, dy);
+      if (dist < CELL * 1.9) {
         inVortex = true;
+        // 1. Giảm tốc độ di chuyển (Đi chậm)
+        tornadoSlowTimer = Math.max(tornadoSlowTimer, 1200);
+
+        // 2. Giật người chơi (Xoáy lốc hút tâm & rung giật)
+        const swirlAngle = Math.atan2(dy, dx) + Math.PI * 0.6;
+        const pullFactor = Math.max(0.4, (CELL * 1.9 - dist) / CELL) * (dt / 1000) * 4.2;
+        const jitterX = (Math.random() - 0.5) * 0.16;
+        const jitterY = (Math.random() - 0.5) * 0.16;
+
+        player.x += Math.cos(swirlAngle) * pullFactor + jitterX;
+        player.y += Math.sin(swirlAngle) * pullFactor + jitterY;
+        player.x = (player.x + GRID) % GRID;
+        player.y = (player.y + GRID) % GRID;
+
         tornadoTickCooldown -= dt;
         if (tornadoTickCooldown <= 0) {
           tornadoTickCooldown = 320;
-          takeTickDamage(5, 'Bị cuốn vào tâm cơn lốc xoáy!', 'tornado');
+          takeTickDamage(6, 'Bị cuốn và giật trong lốc xoáy!', 'tornado');
+          spawnFloatingText('GIẬT & CHẬM!', player.x, player.y, '#e0f2fe');
         }
-        break;
       }
     }
   }
@@ -2430,6 +2492,7 @@ function draw() {
   drawFireCells();
   drawSpreadingFlames();
   drawCraters();
+  drawShockwaves();
   drawLightningCells();
   drawTrail();
   drawPlacedTraps();
@@ -3117,24 +3180,44 @@ function drawSingleSurvivor(p, pDir, slot, name, currentHp, isFrozen, isHit, isD
     ctx.fill();
   }
 
+  // Tornado slow & wind turbulence aura
+  if (slot === mySlot && tornadoSlowTimer > 0 && !isDead) {
+    ctx.save();
+    const swirlTime = now * 0.009;
+    ctx.strokeStyle = 'rgba(165, 243, 252, 0.75)';
+    ctx.lineWidth = 1.6;
+    ctx.setLineDash([6, 4]);
+    ctx.beginPath();
+    ctx.arc(cx, cy, 14, swirlTime, swirlTime + Math.PI * 1.5);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+  }
+
   ctx.restore();
 }
 
+const rgbCache = new Map();
+function hexToRgb(hex) {
+  if (rgbCache.has(hex)) return rgbCache.get(hex);
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  const rgb = result ? `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}` : '74, 222, 128';
+  rgbCache.set(hex, rgb);
+  return rgb;
+}
+
 function drawTrail() {
+  if (trail.length === 0) return;
+  const skin = getEquippedSkin();
+  const rgb = hexToRgb(skin.glow);
   for (const t of trail) {
     const x = t.x * CELL + CELL / 2;
     const y = t.y * CELL + CELL / 2;
-    const skin = getEquippedSkin();
-    ctx.fillStyle = `rgba(${hexToRgb(skin.glow)}, ${t.alpha * 0.2})`;
+    ctx.fillStyle = `rgba(${rgb}, ${t.alpha * 0.2})`;
     ctx.beginPath();
     ctx.arc(x, y, 4, 0, Math.PI * 2);
     ctx.fill();
   }
-}
-
-function hexToRgb(hex) {
-  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-  return result ? `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}` : '74, 222, 128';
 }
 
 function drawFireCells() {
@@ -3142,47 +3225,38 @@ function drawFireCells() {
   const time = performance.now() * 0.005;
 
   for (const key of fireCells) {
-    const [gx, gy] = key.split(',').map(Number);
+    const comma = key.indexOf(',');
+    const gx = parseInt(key.slice(0, comma), 10);
+    const gy = parseInt(key.slice(comma + 1), 10);
     const x = gx * CELL;
     const y = gy * CELL;
 
     const flicker = 0.7 + Math.sin(time + gx * 1.3 + gy * 0.7) * 0.3;
-    ctx.fillStyle = `rgba(255, 23, 68, ${0.4 * flicker})`;
+    ctx.fillStyle = `rgba(255, 23, 68, ${0.35 * flicker})`;
     ctx.fillRect(x, y, CELL, CELL);
 
     const cx = x + CELL / 2;
     const cy = y + CELL / 2;
-    const grd = ctx.createRadialGradient(cx, cy, 0, cx, cy, CELL * 0.7);
-    grd.addColorStop(0, `rgba(255, 234, 0, ${0.45 * flicker})`);
-    grd.addColorStop(0.5, `rgba(255, 23, 68, ${0.3 * flicker})`);
-    grd.addColorStop(1, 'transparent');
-    ctx.fillStyle = grd;
-    ctx.fillRect(x - 2, y - 2, CELL + 4, CELL + 4);
 
-    // Procedural licking dynamic flame tongues
+    // High performance flame tongue (no shadowBlur inside tight loop)
     const flameH = 6 + Math.sin(time * 3 + gx * 2.5 + gy * 1.7) * 3;
     const sway = Math.sin(time * 4 + gy * 2) * 2;
-    ctx.save();
+    ctx.fillStyle = `rgba(255, 234, 0, ${0.85 * flicker})`;
     ctx.beginPath();
     ctx.moveTo(cx - 4, cy + 5);
     ctx.quadraticCurveTo(cx - 5 + sway, cy - 2, cx + sway, cy - flameH);
     ctx.quadraticCurveTo(cx + 4 + sway, cy - 1, cx + 4, cy + 5);
     ctx.closePath();
-    ctx.fillStyle = `rgba(255, 234, 0, ${0.85 * flicker})`;
-    ctx.shadowColor = '#ff3d00';
-    ctx.shadowBlur = 8;
     ctx.fill();
 
     // Inner bright core
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
     ctx.beginPath();
     ctx.moveTo(cx - 2, cy + 4);
     ctx.quadraticCurveTo(cx - 1 + sway * 0.5, cy, cx + sway * 0.5, cy - flameH * 0.5);
     ctx.quadraticCurveTo(cx + 2 + sway * 0.5, cy + 1, cx + 2, cy + 4);
     ctx.closePath();
-    ctx.fillStyle = '#ffffff';
-    ctx.shadowBlur = 0;
     ctx.fill();
-    ctx.restore();
   }
 }
 
@@ -3536,26 +3610,50 @@ function drawCraters() {
       const cx = x + CELL / 2;
       const cy = y + CELL / 2;
 
-      const flicker = 0.5 + Math.sin(time + cell.x * 2.1 + cell.y * 1.7) * 0.3;
-      ctx.fillStyle = `rgba(150, 50, 15, ${0.2 * fadeRatio * flicker})`;
+      // Scorched blast earth (not fire)
+      ctx.fillStyle = `rgba(15, 23, 42, ${0.45 * fadeRatio})`;
       ctx.beginPath();
-      ctx.roundRect(x + 1, y + 1, CELL - 2, CELL - 2, 3);
+      ctx.roundRect(x + 1, y + 1, CELL - 2, CELL - 2, 4);
       ctx.fill();
 
-      const grd = ctx.createRadialGradient(cx, cy, 0, cx, cy, CELL * 0.6);
-      grd.addColorStop(0, `rgba(255, 110, 64, ${0.25 * fadeRatio * flicker})`);
-      grd.addColorStop(1, 'transparent');
-      ctx.fillStyle = grd;
-      ctx.fillRect(x, y, CELL, CELL);
+      // Subtle charred blast core
+      ctx.fillStyle = `rgba(30, 41, 59, ${0.35 * fadeRatio})`;
+      ctx.fillRect(cx - 3, cy - 3, 6, 6);
 
-      if (c.flash > 0.1) {
-        ctx.strokeStyle = `rgba(255, 23, 68, ${c.flash * 0.5})`;
-        ctx.lineWidth = 1;
+      // Brief flash crack on detonation
+      if (c.flash > 0.05) {
+        ctx.strokeStyle = `rgba(255, 234, 0, ${c.flash * 0.8})`;
+        ctx.lineWidth = 1.2;
         ctx.beginPath();
-        ctx.moveTo(cx - 4, cy - 3); ctx.lineTo(cx + 2, cy + 1); ctx.lineTo(cx + 5, cy - 2);
+        ctx.moveTo(cx - 5, cy - 4); ctx.lineTo(cx + 1, cy + 1); ctx.lineTo(cx + 6, cy - 3);
         ctx.stroke();
       }
     }
+  }
+}
+
+function drawShockwaves() {
+  if (shockwaves.length === 0) return;
+  for (let i = shockwaves.length - 1; i >= 0; i--) {
+    const sw = shockwaves[i];
+    const progress = 1 - (sw.life / sw.maxLife);
+    const currentR = sw.r + (sw.maxR - sw.r) * progress;
+    const alpha = 1 - progress;
+
+    ctx.save();
+    ctx.strokeStyle = `rgba(255, 235, 59, ${alpha * 0.9})`;
+    ctx.lineWidth = Math.max(1.2, 4.5 * (1 - progress));
+    ctx.beginPath();
+    ctx.arc(sw.x, sw.y, currentR, 0, Math.PI * 2);
+    ctx.stroke();
+
+    if (progress < 0.35) {
+      ctx.fillStyle = `rgba(255, 255, 255, ${(0.35 - progress) * 2})`;
+      ctx.beginPath();
+      ctx.arc(sw.x, sw.y, currentR * 0.75, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
   }
 }
 
@@ -3577,7 +3675,7 @@ function drawParticles() {
 }
 
 function drawPauseOverlay() {
-  ctx.fillStyle = 'rgba(5, 10, 20, 0.75)';
+  ctx.fillStyle = 'rgba(5, 10, 20, 0.78)';
   ctx.fillRect(0, 0, CANVAS_PX, CANVAS_PX);
 
   ctx.save();
@@ -3587,7 +3685,7 @@ function drawPauseOverlay() {
   const barW = 8;
   const barH = 26;
   const cx = CANVAS_PX / 2;
-  const cy = CANVAS_PX / 2 - 20;
+  const cy = CANVAS_PX / 2 - 28;
   ctx.beginPath();
   ctx.roundRect(cx - barW - 4, cy - barH / 2, barW, barH, 3);
   ctx.roundRect(cx + 4, cy - barH / 2, barW, barH, 3);
@@ -3597,10 +3695,10 @@ function drawPauseOverlay() {
   ctx.fillStyle = '#e8f4fd';
   ctx.font = '700 24px Orbitron, system-ui';
   ctx.textAlign = 'center';
-  ctx.fillText('TẠM DỪNG', CANVAS_PX / 2, CANVAS_PX / 2 + 18);
-  ctx.font = '500 13px Inter, system-ui';
+  ctx.fillText('TẠM DỪNG', CANVAS_PX / 2, CANVAS_PX / 2 + 10);
+  ctx.font = '500 12.5px Inter, system-ui';
   ctx.fillStyle = '#94a3b8';
-  ctx.fillText('Nhấn Space để tiếp tục', CANVAS_PX / 2, CANVAS_PX / 2 + 42);
+  ctx.fillText('Nhấn Space để tiếp tục · Nhấn ESC để thoát', CANVAS_PX / 2, CANVAS_PX / 2 + 36);
   ctx.textAlign = 'start';
 }
 
@@ -3613,6 +3711,21 @@ const DIR_MAP = {
 };
 
 document.addEventListener('keydown', e => {
+  // ESC key: Thoát ra Menu chính ở bất kỳ màn hình nào
+  if (e.key === 'Escape' || e.code === 'Escape') {
+    e.preventDefault();
+    if (!elOverSkinShop.classList.contains('hidden')) {
+      closeSkinShop();
+      return;
+    }
+    if (!elOverOnline.classList.contains('hidden')) {
+      closeOnlineModal();
+      return;
+    }
+    exitToMainMenu();
+    return;
+  }
+
   if (e.key === '1' || e.code === 'Digit1') {
     e.preventDefault();
     if (running && !paused) deployTrap();
@@ -3654,6 +3767,33 @@ document.addEventListener('keydown', e => {
     nextDir = newDir;
   }
 });
+
+function exitToMainMenu() {
+  running = false;
+  paused = false;
+  isCountingDown = false;
+  keysDown.clear();
+  if (loopId) {
+    cancelAnimationFrame(loopId);
+    loopId = null;
+  }
+  if (countdownTimerId) {
+    clearInterval(countdownTimerId);
+    countdownTimerId = null;
+  }
+  hideWarning();
+  if (elPause) elPause.classList.add('hidden');
+  elOverGO.classList.add('hidden');
+  elOverMultiGO.classList.add('hidden');
+  elOverCountdown.classList.add('hidden');
+  elOverSkinShop.classList.add('hidden');
+  elOverOnline.classList.add('hidden');
+  if (isMultiplayer) leaveOnlineRoom();
+  elOverStart.classList.remove('hidden');
+  updateCoinDisplays();
+  draw();
+}
+window.exitToMainMenu = exitToMainMenu;
 
 document.addEventListener('keyup', e => {
   if (DIR_MAP[e.key]) {

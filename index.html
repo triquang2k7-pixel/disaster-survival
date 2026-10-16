@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;800;900&family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=2.2.0">
+  <link rel="stylesheet" href="style.css?v=2.3.0">
   <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 </head>
 <body>
@@ -62,6 +62,13 @@
           <span class="score-label">Xu</span>
           <span class="score-value coins" id="coinDisplay">0</span>
         </div>
+        <div class="score-divider"></div>
+        <button class="btn-header-exit" id="btnHeaderExit" onclick="exitToMainMenu()" title="Thoát ra Menu chính (ESC)">
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2">
+            <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/>
+          </svg>
+          <span>Thoát</span>
+        </button>
       </div>
     </header>
 
@@ -381,10 +388,16 @@
           </div>
           <p class="overlay-reason" id="deathReason">Bạn đã bị thiên tai đánh bại!</p>
           <p class="overlay-record hidden" id="newRecord">Kỷ lục điểm mới!</p>
-          <button class="btn-play glow-btn" onclick="startSoloGame()">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
-            <span>Chạy lại lần nữa</span>
-          </button>
+          <div class="gameover-actions">
+            <button class="btn-play glow-btn" onclick="startSoloGame()">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+              <span>Chạy lại</span>
+            </button>
+            <button class="btn-exit-game glow-btn" onclick="exitToMainMenu()" title="Nhấn phím ESC để thoát">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+              <span>Thoát ra Menu (ESC)</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -412,6 +425,10 @@
             <button class="btn-back" onclick="returnToLobby()">
               <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
               <span>Về sảnh phòng</span>
+            </button>
+            <button class="btn-back" onclick="exitToMainMenu()">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+              <span>Thoát Menu (ESC)</span>
             </button>
           </div>
         </div>
@@ -454,11 +471,11 @@
 
     <!-- Footer -->
     <footer class="game-footer">
-      <span><kbd>WASD</kbd> hoặc <kbd>Mũi tên</kbd> di chuyển mượt · <kbd>3</kbd>/<kbd>F</kbd>/Click Bắn súng · <kbd>1</kbd>/<kbd>2</kbd> Bẫy & Mìn (Online) · <kbd>Space</kbd> tạm dừng</span>
+      <span><kbd>WASD</kbd>/<kbd>Mũi tên</kbd> di chuyển · <kbd>3</kbd>/<kbd>F</kbd>/Click Bắn · <kbd>Space</kbd> Tạm dừng · <kbd>ESC</kbd> Thoát game</span>
       <span class="pause-indicator hidden" id="pauseIndicator">ĐÃ TẠM DỪNG</span>
     </footer>
   </div>
 
-  <script src="game.js?v=2.2.0"></script>
+  <script src="game.js?v=2.3.0"></script>
 </body>
 </html>

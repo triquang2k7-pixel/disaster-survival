@@ -56,29 +56,34 @@ body {
     linear-gradient(rgba(0, 229, 255, .03) 1px, transparent 1px),
     linear-gradient(90deg, rgba(0, 229, 255, .03) 1px, transparent 1px);
   background-size: 60px 60px;
-  animation: gridShift 20s linear infinite;
+  animation: gridShift 25s linear infinite;
+  will-change: transform;
+  transform: translate3d(0, 0, 0);
 }
 @keyframes gridShift {
-  from { transform: translate(0, 0); }
-  to   { transform: translate(60px, 60px); }
+  from { transform: translate3d(0, 0, 0); }
+  to   { transform: translate3d(60px, 60px, 0); }
 }
 
 /* ── Background particles ─────────────────────── */
 .bg-particles {
   position: fixed; inset: 0; z-index: 0; pointer-events: none;
   overflow: hidden;
+  contain: strict;
 }
 .particle {
   position: absolute;
   border-radius: 50%;
   opacity: 0;
   animation: particleFloat linear infinite;
+  will-change: transform, opacity;
+  transform: translate3d(0, 0, 0);
 }
 @keyframes particleFloat {
-  0%   { opacity: 0; transform: translateY(100vh) scale(0); }
-  10%  { opacity: .8; }
-  90%  { opacity: .8; }
-  100% { opacity: 0; transform: translateY(-10vh) scale(1); }
+  0%   { opacity: 0; transform: translate3d(0, 100vh, 0) scale(0); }
+  10%  { opacity: .7; }
+  90%  { opacity: .7; }
+  100% { opacity: 0; transform: translate3d(0, -10vh, 0) scale(1); }
 }
 
 /* ── Game container ───────────────────────────── */
@@ -499,6 +504,62 @@ canvas {
 }
 .go-stat-value.time-val { color: var(--blue); }
 .go-stat-value.coins-val { color: var(--orange); font-size: 16px; }
+
+/* ── Exit Buttons & Action Group ─────────────── */
+.btn-header-exit {
+  background: rgba(255, 23, 68, 0.12);
+  border: 1px solid rgba(255, 23, 68, 0.32);
+  color: #ff8a80;
+  padding: 5px 9px;
+  border-radius: 8px;
+  font: 700 11px 'Inter', sans-serif;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+.btn-header-exit:hover {
+  background: rgba(255, 23, 68, 0.25);
+  border-color: #ff1744;
+  color: #fff;
+  transform: translateY(-1px);
+}
+.gameover-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-top: 8px;
+  width: 100%;
+}
+.btn-exit-game {
+  background: rgba(255, 23, 68, 0.12);
+  border: 1px solid rgba(255, 23, 68, 0.35);
+  color: #ff8a80;
+  padding: 13px 22px;
+  border-radius: 14px;
+  font: 700 13px 'Inter', sans-serif;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+  margin-top: 4px;
+}
+.btn-exit-game:hover {
+  background: rgba(255, 23, 68, 0.25);
+  border-color: #ff1744;
+  color: #fff;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(255, 23, 68, 0.35);
+}
+.btn-exit-game:active {
+  transform: scale(0.97);
+}
 
 /* ── Buttons ──────────────────────────────────── */
 .btn-play {
