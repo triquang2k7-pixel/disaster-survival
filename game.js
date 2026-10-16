@@ -1341,6 +1341,10 @@ function updateFireWave(dt) {
       fireWave.state = 'sweeping';
       fireWave.stateTime = 0;
       fireWave.frontPos = 0;
+      fireWave.emberTimer = 0;
+      // "núi lửa tràn qua thêm random vài chỗ có lửa"
+      // Khi núi lửa bắt đầu tràn qua, văng dung nham tạo ngẫu nhiên 3-5 đốm lửa bốc cháy trên sân
+      spawnRandomVolcanoFire(3 + Math.floor(Math.random() * 3));
     }
     return;
   }
@@ -1350,6 +1354,13 @@ function updateFireWave(dt) {
     while (fireWave.sweepAcc >= FIRE_SWEEP_SPEED) {
       fireWave.sweepAcc -= FIRE_SWEEP_SPEED;
       fireWave.frontPos++;
+    }
+
+    // Đốm lửa tàn tích núi lửa liên tục rơi ngẫu nhiên vài chỗ trong suốt quá trình quét
+    fireWave.emberTimer = (fireWave.emberTimer || 0) + dt;
+    if (fireWave.emberTimer >= 360) {
+      fireWave.emberTimer -= 360;
+      spawnRandomVolcanoFire(1 + (Math.random() < 0.45 ? 1 : 0));
     }
 
     fireCells = new Set();
@@ -1370,11 +1381,11 @@ function updateFireWave(dt) {
           const key = `${gx},${gy}`;
           fireCells.add(key);
 
-          if (Math.random() < 0.10 && spreadingFlames.size < 6) {
+          if (Math.random() < 0.12 && spreadingFlames.size < 20) {
             if (!spreadingFlames.has(key) && !puddleCells.has(key)) {
               spreadingFlames.set(key, {
                 x: gx, y: gy,
-                life: 3500, maxLife: 3500,
+                life: 3800 + Math.random() * 2500, maxLife: 6500,
                 gen: 0,
                 spreadTimer: 700 + Math.random() * 400
               });
@@ -1394,11 +1405,11 @@ function updateFireWave(dt) {
             const key = `${gx},${gy}`;
             fireCells.add(key);
 
-            if (Math.random() < 0.10 && spreadingFlames.size < 6) {
+            if (Math.random() < 0.12 && spreadingFlames.size < 20) {
               if (!spreadingFlames.has(key) && !puddleCells.has(key)) {
                 spreadingFlames.set(key, {
                   x: gx, y: gy,
-                  life: 3500, maxLife: 3500,
+                  life: 3800 + Math.random() * 2500, maxLife: 6500,
                   gen: 0,
                   spreadTimer: 700 + Math.random() * 400
                 });
@@ -1413,11 +1424,19 @@ function updateFireWave(dt) {
     if (fw.frontPos >= fw.maxDistance) {
       fireWave.state = 'burning';
       fireWave.stateTime = 0;
+      // Khi sóng dung nham tràn qua hết, để lại thêm vài đốm lửa tàn tích cháy rực khắp sân
+      spawnRandomVolcanoFire(2 + Math.floor(Math.random() * 3));
     }
     return;
   }
 
   if (fireWave.state === 'burning') {
+    fireWave.emberTimer = (fireWave.emberTimer || 0) + dt;
+    if (fireWave.emberTimer >= 600) {
+      fireWave.emberTimer -= 600;
+      spawnRandomVolcanoFire(1);
+    }
+
     if (fireWave.stateTime >= FIRE_BURN_TIME) {
       fireWave = null;
       fireCells = new Set();
@@ -1432,7 +1451,7 @@ function updateSpreadingFlames(dt) {
     f.life -= dt;
     f.spreadTimer -= dt;
 
-    if (f.spreadTimer <= 0 && f.gen < 1 && spreadingFlames.size < 6) {
+    if (f.spreadTimer <= 0 && f.gen < 1 && spreadingFlames.size < 20) {
       f.spreadTimer = 1200 + Math.random() * 600;
 
       if (Math.random() < 0.12) {
@@ -1446,7 +1465,7 @@ function updateSpreadingFlames(dt) {
           if (!puddleCells.has(nKey) && !spreadingFlames.has(nKey)) {
             newFlames.push({
               key: nKey,
-              data: { x: nx, y: ny, life: 3000, maxLife: 3000, gen: f.gen + 1, spreadTimer: 99999 }
+              data: { x: nx, y: ny, life: 3200, maxLife: 3200, gen: f.gen + 1, spreadTimer: 99999 }
             });
             burntGrass.set(nKey, 8000);
             spawnFireSparks(nx, ny);
@@ -1459,9 +1478,64 @@ function updateSpreadingFlames(dt) {
   }
 
   for (const nf of newFlames) {
-    if (!spreadingFlames.has(nf.key) && spreadingFlames.size < 6) {
+    if (!spreadingFlames.has(nf.key) && spreadingFlames.size < 20) {
       spreadingFlames.set(nf.key, nf.data);
     }
+  }
+}
+
+// ── Random Volcanic Fire Spots ("núi lửa tràn qua thêm random vài chỗ có lửa") ──
+function spawnRandomVolcanoFire(count = 1) {
+  if (spreadingFlames.size >= 20) return;
+
+  for (let c = 0; c < count; c++) {
+    let rx, ry, tries = 0;
+    let found = false;
+    do {
+      rx = Math.floor(Math.random() * GRID);
+      ry = Math.floor(Math.random() * GRID);
+      const key = `${rx},${ry}`;
+      // Giữ khoảng cách an toàn nhẹ với người chơi để không bị nổ lửa ngay chân
+      const pDist = (player && typeof player.x === 'number') ? Math.hypot(rx - player.x, ry - player.y) : 5;
+
+      if (!puddleCells.has(key) && !spreadingFlames.has(key) && !fireCells.has(key) && pDist > 1.8) {
+        found = true;
+        spreadingFlames.set(key, {
+          x: rx,
+          y: ry,
+          life: 4500 + Math.random() * 3200, // Cháy từ 4.5s đến 7.7s
+          maxLife: 7700,
+          gen: 0,
+          isVolcanoEmber: true,
+          spreadTimer: 1400 + Math.random() * 800
+        });
+        burntGrass.set(key, 16000);
+        spawnFireSparks(rx, ry);
+        spawnVolcanoEmberArc(rx, ry);
+        break;
+      }
+      tries++;
+    } while (tries < 40);
+  }
+}
+
+function spawnVolcanoEmberArc(gx, gy) {
+  const targetX = gx * CELL + CELL / 2;
+  const targetY = gy * CELL + CELL / 2;
+  const startX = targetX + (Math.random() - 0.5) * 50;
+  const startY = targetY - (35 + Math.random() * 45);
+
+  for (let i = 0; i < 4; i++) {
+    particles.push({
+      x: startX,
+      y: startY,
+      vx: (targetX - startX) * 0.08 + (Math.random() - 0.5) * 1.5,
+      vy: (targetY - startY) * 0.08 + (Math.random() - 0.5) * 1.5,
+      size: 2.2 + Math.random() * 2,
+      color: Math.random() < 0.6 ? '#ff3d00' : '#ffea00',
+      life: 280 + Math.random() * 200,
+      maxLife: 480,
+    });
   }
 }
 
@@ -2812,6 +2886,23 @@ function drawSpreadingFlames() {
     ctx.quadraticCurveTo(cx + 5, cy, cx + 3, cy + 4);
     ctx.closePath();
     ctx.fill();
+
+    // Volcanic ember core & crackling sparks
+    if (f.isVolcanoEmber) {
+      ctx.fillStyle = `rgba(255, 61, 0, ${0.85 * flicker})`;
+      ctx.beginPath();
+      ctx.arc(cx, cy + 3, 4.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = `rgba(255, 255, 255, ${0.9 * flicker})`;
+      ctx.beginPath();
+      ctx.arc(cx, cy + 3, 1.8, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (Math.random() < 0.06 && particles.length < 75) {
+        spawnFireSparks(f.x, f.y);
+      }
+    }
   }
 }
 
@@ -4787,7 +4878,7 @@ function broadcastDisasterSync() {
   const syncMsg = {
     type: 'SYNC_DISASTERS',
     fireWave: fireWave,
-    spreadingFlames: Array.from(spreadingFlames.entries()).map(([k, v]) => ({ key: k, x: v.x, y: v.y, life: v.life, gen: v.gen })),
+    spreadingFlames: Array.from(spreadingFlames.entries()).map(([k, v]) => ({ key: k, x: v.x, y: v.y, life: v.life, gen: v.gen, isVolcanoEmber: !!v.isVolcanoEmber })),
     thunderstorm: thunderstorm ? { state: thunderstorm.state, targetZones: thunderstorm.targetZones } : null,
     lightningCells: Array.from(lightningCells),
     puddleCells: Array.from(puddleCells),
@@ -4810,8 +4901,8 @@ function applyDisasterSync(sync) {
   if (sync.spreadingFlames) {
     spreadingFlames = new Map();
     for (const item of sync.spreadingFlames) {
-      spreadingFlames.set(item.key, { x: item.x, y: item.y, life: item.life, maxLife: 6000, gen: item.gen, spreadTimer: 800 });
-      burntGrass.set(item.key, 10000);
+      spreadingFlames.set(item.key, { x: item.x, y: item.y, life: item.life, maxLife: 7500, gen: item.gen, isVolcanoEmber: !!item.isVolcanoEmber, spreadTimer: 800 });
+      burntGrass.set(item.key, 12000);
     }
   }
 
