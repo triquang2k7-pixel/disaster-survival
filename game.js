@@ -20,35 +20,35 @@ let currentSpeed = 'normal';
 const MAX_HP = 100;
 
 // Disaster Timers
-const FIRE_INTERVAL_MIN     = 13000;
-const FIRE_INTERVAL_MAX     = 18000;
-const FIRE_WARN_TIME        = 4200;
-const FIRE_SWEEP_SPEED      = 170;
-const FIRE_BURN_TIME        = 2500;
+const FIRE_INTERVAL_MIN = 13000;
+const FIRE_INTERVAL_MAX = 18000;
+const FIRE_WARN_TIME = 4200;
+const FIRE_SWEEP_SPEED = 170;
+const FIRE_BURN_TIME = 2500;
 
-const THUNDER_INTERVAL_MIN  = 15000;
-const THUNDER_INTERVAL_MAX  = 21000;
-const THUNDER_WARN_TIME     = 4200;
-const THUNDER_STRIKE_TIME   = 600;
-const THUNDER_SHOCK_TIME    = 2500;
+const THUNDER_INTERVAL_MIN = 15000;
+const THUNDER_INTERVAL_MAX = 21000;
+const THUNDER_WARN_TIME = 4200;
+const THUNDER_STRIKE_TIME = 600;
+const THUNDER_SHOCK_TIME = 2500;
 
-const TORNADO_INTERVAL_MIN  = 16000;
-const TORNADO_INTERVAL_MAX  = 23000;
-const TORNADO_WARN_TIME     = 3800;
-const TORNADO_DURATION      = 11000;
+const TORNADO_INTERVAL_MIN = 16000;
+const TORNADO_INTERVAL_MAX = 23000;
+const TORNADO_WARN_TIME = 3800;
+const TORNADO_DURATION = 11000;
 
-const LANDSLIDE_INTERVAL_MIN= 17000;
-const LANDSLIDE_INTERVAL_MAX= 24000;
-const LANDSLIDE_WARN_TIME   = 4200;
+const LANDSLIDE_INTERVAL_MIN = 17000;
+const LANDSLIDE_INTERVAL_MAX = 24000;
+const LANDSLIDE_WARN_TIME = 4200;
 const LANDSLIDE_COLLAPSE_TIME = 6500;
 
-const BOMB_INTERVAL_MIN     = 11000;
-const BOMB_INTERVAL_MAX     = 16000;
-const BOMB_FUSE_TIME        = 4500;
-const BOMB_BLAST_RADIUS     = 2;
-const BOMB_CRATER_DURATION  = 4000;
+const BOMB_INTERVAL_MIN = 11000;
+const BOMB_INTERVAL_MAX = 16000;
+const BOMB_FUSE_TIME = 4500;
+const BOMB_BLAST_RADIUS = 2;
+const BOMB_CRATER_DURATION = 4000;
 
-const ITEM_SPAWN_INTERVAL   = 6500;
+const ITEM_SPAWN_INTERVAL = 6500;
 
 // Gun Constants
 const GUN_BULLET_SPEED = 6; // pixels per frame
@@ -60,18 +60,18 @@ const GUN_BULLET_MAX_RANGE = CANVAS_PX; // max travel distance
 // ══════════════════════════════════════════════
 
 const SKIN_CATALOG = [
-  { id: 'default',   name: 'Chiến Binh',     price: 0,   jacket: '#ea580c', cap: '#0284c7', glow: '#fb923c' },
-  { id: 'ninja',     name: 'Ninja Bóng Đêm', price: 100, jacket: '#1e293b', cap: '#334155', glow: '#475569' },
-  { id: 'fire',      name: 'Chiến Binh Lửa', price: 150, jacket: '#dc2626', cap: '#f59e0b', glow: '#ef4444' },
-  { id: 'ice',       name: 'Băng Giá',       price: 150, jacket: '#0284c7', cap: '#7dd3fc', glow: '#38bdf8' },
-  { id: 'toxic',     name: 'Độc Tố Xanh',    price: 200, jacket: '#15803d', cap: '#84cc16', glow: '#4ade80' },
-  { id: 'royal',     name: 'Hoàng Gia',       price: 250, jacket: '#7c3aed', cap: '#fbbf24', glow: '#a78bfa' },
-  { id: 'cyber',     name: 'Chiến Binh Cyber',price: 300, jacket: '#06b6d4', cap: '#d946ef', glow: '#22d3ee' },
-  { id: 'shadow',    name: 'Bóng Ma',         price: 350, jacket: '#18181b', cap: '#52525b', glow: '#71717a' },
-  { id: 'golden',    name: 'Vàng Ròng',       price: 500, jacket: '#d97706', cap: '#fbbf24', glow: '#f59e0b' },
-  { id: 'rainbow',   name: 'Cầu Vồng',       price: 800, jacket: '#ec4899', cap: '#8b5cf6', glow: '#f472b6' },
-  { id: 'dragon',    name: 'Rồng Thần',       price: 1000,jacket: '#b91c1c', cap: '#fbbf24', glow: '#dc2626' },
-  { id: 'diamond',   name: 'Kim Cương',       price: 1500,jacket: '#0ea5e9', cap: '#e0f2fe', glow: '#38bdf8' },
+  { id: 'default', name: 'Chiến Binh', price: 0, jacket: '#ea580c', cap: '#0284c7', glow: '#fb923c' },
+  { id: 'ninja', name: 'Ninja Bóng Đêm', price: 100, jacket: '#1e293b', cap: '#334155', glow: '#475569' },
+  { id: 'fire', name: 'Chiến Binh Lửa', price: 150, jacket: '#dc2626', cap: '#f59e0b', glow: '#ef4444' },
+  { id: 'ice', name: 'Băng Giá', price: 150, jacket: '#0284c7', cap: '#7dd3fc', glow: '#38bdf8' },
+  { id: 'toxic', name: 'Độc Tố Xanh', price: 200, jacket: '#15803d', cap: '#84cc16', glow: '#4ade80' },
+  { id: 'royal', name: 'Hoàng Gia', price: 250, jacket: '#7c3aed', cap: '#fbbf24', glow: '#a78bfa' },
+  { id: 'cyber', name: 'Chiến Binh Cyber', price: 300, jacket: '#06b6d4', cap: '#d946ef', glow: '#22d3ee' },
+  { id: 'shadow', name: 'Bóng Ma', price: 350, jacket: '#18181b', cap: '#52525b', glow: '#71717a' },
+  { id: 'golden', name: 'Vàng Ròng', price: 500, jacket: '#d97706', cap: '#fbbf24', glow: '#f59e0b' },
+  { id: 'rainbow', name: 'Cầu Vồng', price: 800, jacket: '#ec4899', cap: '#8b5cf6', glow: '#f472b6' },
+  { id: 'dragon', name: 'Rồng Thần', price: 1000, jacket: '#b91c1c', cap: '#fbbf24', glow: '#dc2626' },
+  { id: 'diamond', name: 'Kim Cương', price: 1500, jacket: '#0ea5e9', cap: '#e0f2fe', glow: '#38bdf8' },
 ];
 
 // 4 Player Appearance (multiplayer fallback skins)
@@ -83,9 +83,9 @@ const PLAYER_SKINS_MULTI = [
 ];
 
 const INITIAL_SPAWNS = [
-  { x: 5,  y: 5  },
-  { x: 14, y: 5  },
-  { x: 5,  y: 14 },
+  { x: 5, y: 5 },
+  { x: 14, y: 5 },
+  { x: 5, y: 14 },
   { x: 14, y: 14 },
 ];
 
@@ -117,68 +117,68 @@ function getPlayerSkin(slot) {
 }
 
 // ── DOM refs ──────────────────────────────────
-const canvas        = document.getElementById('gameCanvas');
-const ctx           = canvas.getContext('2d');
-const elScore       = document.getElementById('score');
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const elScore = document.getElementById('score');
 const elTimeDisplay = document.getElementById('timeDisplay');
-const elBest        = document.getElementById('bestScore');
-const elFinal       = document.getElementById('finalScore');
-const elFinalTime   = document.getElementById('finalTime');
-const elFinalCoins  = document.getElementById('finalCoins');
-const elDeath       = document.getElementById('deathReason');
-const elNewRecord   = document.getElementById('newRecord');
-const elOverStart   = document.getElementById('overlayStart');
-const elOverGO      = document.getElementById('overlayGameOver');
-const elOverOnline  = document.getElementById('overlayOnline');
+const elBest = document.getElementById('bestScore');
+const elFinal = document.getElementById('finalScore');
+const elFinalTime = document.getElementById('finalTime');
+const elFinalCoins = document.getElementById('finalCoins');
+const elDeath = document.getElementById('deathReason');
+const elNewRecord = document.getElementById('newRecord');
+const elOverStart = document.getElementById('overlayStart');
+const elOverGO = document.getElementById('overlayGameOver');
+const elOverOnline = document.getElementById('overlayOnline');
 const elOverMultiGO = document.getElementById('overlayMultiGameOver');
 const elOverCountdown = document.getElementById('overlayCountdown');
-const elCountdownNum  = document.getElementById('countdownNum');
-const elCountdownSub  = document.getElementById('countdownSub');
-const elPause       = document.getElementById('pauseIndicator');
-const wrapper       = document.getElementById('canvasWrapper');
-const elWarn        = document.getElementById('hazardWarning');
-const elWarnText    = document.getElementById('hazardWarnText');
-const elMultiHud    = document.getElementById('multiHud');
+const elCountdownNum = document.getElementById('countdownNum');
+const elCountdownSub = document.getElementById('countdownSub');
+const elPause = document.getElementById('pauseIndicator');
+const wrapper = document.getElementById('canvasWrapper');
+const elWarn = document.getElementById('hazardWarning');
+const elWarnText = document.getElementById('hazardWarnText');
+const elMultiHud = document.getElementById('multiHud');
 const elCoinDisplay = document.getElementById('coinDisplay');
 const elOverSkinShop = document.getElementById('overlaySkinShop');
-const elSkinGrid    = document.getElementById('skinGrid');
+const elSkinGrid = document.getElementById('skinGrid');
 const elShopCoinDisplay = document.getElementById('shopCoinDisplay');
 
-let isCountingDown   = false;
+let isCountingDown = false;
 let countdownTimerId = null;
 
 // HP & Inventory DOM refs
-const elHpFill      = document.getElementById('hpFill');
-const elHpText      = document.getElementById('hpText');
-const elSlotTrap    = document.getElementById('slotTrap');
-const elSlotMine    = document.getElementById('slotMine');
-const elSlotGun     = document.getElementById('slotGun');
-const elCountTrap   = document.getElementById('countTrap');
-const elCountMine   = document.getElementById('countMine');
-const elCountGun    = document.getElementById('countGun');
-const elEventToast  = document.getElementById('eventToast');
-const elToastText   = document.getElementById('toastText');
+const elHpFill = document.getElementById('hpFill');
+const elHpText = document.getElementById('hpText');
+const elSlotTrap = document.getElementById('slotTrap');
+const elSlotMine = document.getElementById('slotMine');
+const elSlotGun = document.getElementById('slotGun');
+const elCountTrap = document.getElementById('countTrap');
+const elCountMine = document.getElementById('countMine');
+const elCountGun = document.getElementById('countGun');
+const elEventToast = document.getElementById('eventToast');
+const elToastText = document.getElementById('toastText');
 
 // Online DOM refs
-const elViewOnlineMenu    = document.getElementById('viewOnlineMenu');
-const elViewOnlineLobby   = document.getElementById('viewOnlineLobby');
-const elOnlinePlayerName  = document.getElementById('onlinePlayerName');
-const elInputRoomCode     = document.getElementById('inputRoomCode');
-const elOnlineError       = document.getElementById('onlineError');
-const elDisplayRoomCode   = document.getElementById('displayRoomCode');
-const elDisplayPlayerCount= document.getElementById('displayPlayerCount');
-const elPlayerSlots       = document.getElementById('playerSlotsContainer');
+const elViewOnlineMenu = document.getElementById('viewOnlineMenu');
+const elViewOnlineLobby = document.getElementById('viewOnlineLobby');
+const elOnlinePlayerName = document.getElementById('onlinePlayerName');
+const elInputRoomCode = document.getElementById('inputRoomCode');
+const elOnlineError = document.getElementById('onlineError');
+const elDisplayRoomCode = document.getElementById('displayRoomCode');
+const elDisplayPlayerCount = document.getElementById('displayPlayerCount');
+const elPlayerSlots = document.getElementById('playerSlotsContainer');
 const elBtnStartMultiGame = document.getElementById('btnStartMultiGame');
-const elGuestWaitingMsg   = document.getElementById('guestWaitingMsg');
-const elBtnToggleReady    = document.getElementById('btnToggleReady');
-const elTextToggleReady   = document.getElementById('textToggleReady');
-const elLobbyNoticeBar    = document.getElementById('lobbyNoticeBar');
-const elTextStartMulti    = document.getElementById('textStartMulti');
-const elRoomInviteHint    = document.getElementById('roomInviteHint');
-const elResRoomCode       = document.getElementById('resRoomCode');
-const elLeaderboardList   = document.getElementById('leaderboardList');
-const elBtnHostPlayAgain  = document.getElementById('btnHostPlayAgain');
-const elModeSubtitle      = document.getElementById('modeSubtitle');
+const elGuestWaitingMsg = document.getElementById('guestWaitingMsg');
+const elBtnToggleReady = document.getElementById('btnToggleReady');
+const elTextToggleReady = document.getElementById('textToggleReady');
+const elLobbyNoticeBar = document.getElementById('lobbyNoticeBar');
+const elTextStartMulti = document.getElementById('textStartMulti');
+const elRoomInviteHint = document.getElementById('roomInviteHint');
+const elResRoomCode = document.getElementById('resRoomCode');
+const elLeaderboardList = document.getElementById('leaderboardList');
+const elBtnHostPlayAgain = document.getElementById('btnHostPlayAgain');
+const elModeSubtitle = document.getElementById('modeSubtitle');
 
 // Internal Canvas Camera Shake (Pure 2D context offset - NO DOM text jumping!)
 let camShakeTimer = 0;
@@ -193,9 +193,9 @@ function triggerScreenShake(intensity = 3, duration = 200) {
 const FOG_COUNT = 14;
 const FOG_CLEAR_TIME_MIN = 22000; // ~22s trời quang đãng không sương mù
 const FOG_CLEAR_TIME_MAX = 35000; // ~35s trời quang đãng
-const FOG_FADE_IN_TIME   = 3500;  // 3.5s sương mù từ từ tràn vào
-const FOG_ACTIVE_TIME    = 13000; // 13s sương mù bao phủ mờ nhẹ
-const FOG_FADE_OUT_TIME  = 3500;  // 3.5s sương mù tan dần
+const FOG_FADE_IN_TIME = 3500;  // 3.5s sương mù từ từ tràn vào
+const FOG_ACTIVE_TIME = 13000; // 13s sương mù bao phủ mờ nhẹ
+const FOG_FADE_OUT_TIME = 3500;  // 3.5s sương mù tan dần
 let fogPuffs = [];
 let fogWeather = {
   state: 'inactive', // 'inactive', 'entering', 'active', 'leaving'
@@ -259,7 +259,7 @@ function updateFogWeather(dt) {
 let joinWatchdogTimer = null;
 let roomHeartbeatTimer = null;
 
-canvas.width  = CANVAS_PX;
+canvas.width = CANVAS_PX;
 canvas.height = CANVAS_PX;
 
 // ── Player & Gameplay State ───────────────────
@@ -306,7 +306,7 @@ function showCombatAlert(msg, type = 'normal') {
 window.showCombatAlert = showCombatAlert;
 
 // 4-Character Room Code Validation
-window.handleRoomCodeInput = function(input) {
+window.handleRoomCodeInput = function (input) {
   if (!input) return;
   const raw = input.value;
   const clean = raw.toUpperCase().replace(/[^A-Z0-9]/g, '');
@@ -414,10 +414,10 @@ const lawnDecorations = [];
     const sz = 2 + Math.random() * 2;
     p.style.cssText = `
       width:${sz}px;height:${sz}px;
-      left:${Math.random()*100}%;
-      background:${colors[i%colors.length]};
-      animation-duration:${10+Math.random()*12}s;
-      animation-delay:${-Math.random()*15}s;
+      left:${Math.random() * 100}%;
+      background:${colors[i % colors.length]};
+      animation-duration:${10 + Math.random() * 12}s;
+      animation-delay:${-Math.random() * 15}s;
       will-change: transform;
       transform: translate3d(0, 0, 0);
     `;
@@ -591,10 +591,11 @@ function startSoloGame() {
 
 function startGame() {
   const spawn = isMultiplayer ? INITIAL_SPAWNS[mySlot % 4] : { x: 10, y: 10 };
-  const initDir = (spawn.x < GRID / 2) ? { x: 1, y: 0 } : { x: -1, y: 0 };
-  player  = { x: spawn.x, y: spawn.y, angle: Math.atan2(initDir.y, initDir.x), runDist: 0 };
-  dir     = { ...initDir };
-  nextDir = { ...initDir };
+  const initFacingAngle = (spawn.x < GRID / 2) ? 0 : Math.PI;
+  player = { x: spawn.x, y: spawn.y, angle: initFacingAngle, runDist: 0 };
+  // Bắt đầu game: Nhân vật ĐỨNG YÊN, chỉ di chuyển khi người chơi ấn phím/joystick!
+  dir = { x: 0, y: 0 };
+  nextDir = { x: 0, y: 0 };
   keysDown.clear();
   tornadoConvergenceTimer = 0;
   isTornadoConverging = false;
@@ -602,11 +603,11 @@ function startGame() {
   survivalTime = 0;
   bonusScore = 0;
   roundCoins = 0;
-  paused  = false;
+  paused = false;
   running = true;
   isSpectator = false;
   particles = [];
-  trail   = [];
+  trail = [];
   floatingTexts = [];
   bullets = [];
 
@@ -615,15 +616,16 @@ function startGame() {
   damageCooldown = 0;
   trapFrozenTimer = 0;
 
-  // SOLO MODE: No traps or mines! Only heart and gun items
+  // "Khi chơi đơn không có khẩu súng"
   if (!isMultiplayer) {
     trapCount = 0;
     mineCount = 0;
+    gunAmmo = 0; // Chơi đơn không có súng và đạn!
   } else {
     trapCount = 1;
     mineCount = 1;
+    gunAmmo = 3; // Chỉ chơi online mới có súng và đạn
   }
-  gunAmmo = 3;
   sinkholeCycleTimer = 0;
 
   items = [];
@@ -635,43 +637,43 @@ function startGame() {
   updateInventoryUI();
 
   // Reset Concurrent Disasters
-  fireWave        = null;
-  fireCells       = new Set();
+  fireWave = null;
+  fireCells = new Set();
   spreadingFlames = new Map();
-  burntGrass      = new Map();
-  fireTimer       = 3500;
+  burntGrass = new Map();
+  fireTimer = 3500;
 
-  thunderstorm    = null;
-  lightningCells  = new Set();
-  raindrops       = [];
-  puddleCells     = new Set();
+  thunderstorm = null;
+  lightningCells = new Set();
+  raindrops = [];
+  puddleCells = new Set();
   electrifiedPuddles = new Set();
   puddleSpreadAcc = 0;
-  thunderTimer    = 7000;
+  thunderTimer = 7000;
 
-  tornadoes       = [];
-  tornado         = null;
-  tornadoTimer    = 10000;
+  tornadoes = [];
+  tornado = null;
+  tornadoTimer = 10000;
 
-  burnDuration    = 0;
+  burnDuration = 0;
   burnTickCooldown = 0;
   electroTickCooldown = 0;
   sinkholeTickCooldown = 0;
   tornadoTickCooldown = 0;
   playerHurtFlash = 0;
 
-  landslide       = null;
-  sinkholeCells   = new Set();
-  landslideTimer  = 13000;
+  landslide = null;
+  sinkholeCells = new Set();
+  landslideTimer = 13000;
 
-  bombs           = [];
-  craters         = [];
-  shockwaves      = [];
-  bombTimer       = 5500;
+  bombs = [];
+  craters = [];
+  shockwaves = [];
+  bombTimer = 5500;
   tornadoSlowTimer = 0;
 
   // Sương mù bắt đầu ở trạng thái quang đãng 20-30s ("lâu lâu mới xuất hiện")
-  fogWeather      = { state: 'inactive', timer: 20000 + Math.random() * 10000, currentAlpha: 0 };
+  fogWeather = { state: 'inactive', timer: 20000 + Math.random() * 10000, currentAlpha: 0 };
 
   hideWarning();
 
@@ -786,14 +788,18 @@ function updateInventoryUI() {
   if (mobCountMine) mobCountMine.textContent = 'x' + mineCount;
   if (mobCountGun) mobCountGun.textContent = 'x' + gunAmmo;
 
-  // In Solo mode: hide traps and mines slots completely!
+  // In Solo mode: hide traps, mines, and gun slots completely!
   if (elSlotTrap) elSlotTrap.classList.toggle('hidden', !isMultiplayer);
   if (elSlotMine) elSlotMine.classList.toggle('hidden', !isMultiplayer);
+  const elSlotGun = document.getElementById('slotGun');
+  if (elSlotGun) elSlotGun.classList.toggle('hidden', !isMultiplayer);
 
   const mobileTrap = document.getElementById('mobileBtnTrap');
   const mobileMine = document.getElementById('mobileBtnMine');
+  const mobileShoot = document.getElementById('mobileBtnShoot');
   if (mobileTrap) mobileTrap.classList.toggle('hidden', !isMultiplayer);
   if (mobileMine) mobileMine.classList.toggle('hidden', !isMultiplayer);
+  if (mobileShoot) mobileShoot.classList.toggle('hidden', !isMultiplayer);
 }
 
 function takeDamage(amount, reason) {
@@ -911,7 +917,8 @@ function showToast(msg) {
 // ══════════════════════════════════════════════
 
 function shootGun(targetX, targetY) {
-  if (isSpectator || trapFrozenTimer > 0 || !running || paused) return;
+  // "Khi chơi đơn không có khẩu súng"
+  if (!isMultiplayer || isSpectator || trapFrozenTimer > 0 || !running || paused) return;
 
   if (gunAmmo <= 0) {
     showToast('Bạn chưa có đạn! Hãy nhặt súng Plasma trên bản đồ.');
@@ -1269,9 +1276,8 @@ function spawnItem() {
   const rand = Math.random();
 
   if (!isMultiplayer) {
-    // SOLO: Only hearts, guns, and coins (NO traps or mines!)
-    if (rand < 0.40) type = 'heart';
-    else if (rand < 0.75) type = 'gun';
+    // "Khi chơi đơn không có khẩu súng" -> Chỉ có tim hồi máu và xu!
+    if (rand < 0.65) type = 'heart';
     else type = 'coin';
   } else {
     // MULTIPLAYER: hearts, traps, mines, guns, coins
@@ -1411,18 +1417,6 @@ function startFireWave() {
     sweepAcc: 0,
     thickness: isDiag ? 4 : 3,
   };
-
-  // "lúc núi lửa xảy ra thì lâu lâu có mưa sấm chớp xảy hoặc không"
-  // Dynamic chance (42%): Volcanic storm combines eruption with sudden lightning & rain
-  const triggerStorm = Math.random() < 0.42;
-  if (triggerStorm && !thunderstorm) {
-    setTimeout(() => {
-      if (running && !thunderstorm) {
-        startThunderstorm();
-        showToast('THIÊN TAI KÉP: Núi Lửa kèm Mưa Bão Sấm Chớp!');
-      }
-    }, 1800);
-  }
 }
 
 function updateFireWave(dt) {
@@ -1452,10 +1446,6 @@ function updateFireWave(dt) {
       fireWave.state = 'sweeping';
       fireWave.stateTime = 0;
       fireWave.frontPos = 0;
-      fireWave.emberTimer = 0;
-      // "núi lửa tràn qua thêm random vài chỗ có lửa"
-      // Khi núi lửa bắt đầu tràn qua, văng dung nham tạo ngẫu nhiên 3-5 đốm lửa bốc cháy trên sân
-      spawnRandomVolcanoFire(3 + Math.floor(Math.random() * 3));
     }
     return;
   }
@@ -1465,13 +1455,6 @@ function updateFireWave(dt) {
     while (fireWave.sweepAcc >= FIRE_SWEEP_SPEED) {
       fireWave.sweepAcc -= FIRE_SWEEP_SPEED;
       fireWave.frontPos++;
-    }
-
-    // Đốm lửa tàn tích núi lửa liên tục rơi ngẫu nhiên vài chỗ trong suốt quá trình quét
-    fireWave.emberTimer = (fireWave.emberTimer || 0) + dt;
-    if (fireWave.emberTimer >= 360) {
-      fireWave.emberTimer -= 360;
-      spawnRandomVolcanoFire(1 + (Math.random() < 0.45 ? 1 : 0));
     }
 
     fireCells = new Set();
@@ -1484,24 +1467,13 @@ function updateFireWave(dt) {
       if (!fw.isDiag) {
         for (let r = 0; r < GRID; r++) {
           let gx, gy;
-          if (fw.dir === 'left')       { gx = pos; gy = r; }
+          if (fw.dir === 'left') { gx = pos; gy = r; }
           else if (fw.dir === 'right') { gx = GRID - 1 - pos; gy = r; }
-          else if (fw.dir === 'top')   { gx = r; gy = pos; }
-          else                         { gx = r; gy = GRID - 1 - pos; }
+          else if (fw.dir === 'top') { gx = r; gy = pos; }
+          else { gx = r; gy = GRID - 1 - pos; }
 
           const key = `${gx},${gy}`;
           fireCells.add(key);
-
-          if (Math.random() < 0.12 && spreadingFlames.size < 20) {
-            if (!spreadingFlames.has(key) && !puddleCells.has(key)) {
-              spreadingFlames.set(key, {
-                x: gx, y: gy,
-                life: 3800 + Math.random() * 2500, maxLife: 6500,
-                gen: 0,
-                spreadTimer: 700 + Math.random() * 400
-              });
-            }
-          }
           burntGrass.set(key, 12000);
         }
       } else {
@@ -1515,18 +1487,58 @@ function updateFireWave(dt) {
           if (gx >= 0 && gx < GRID && gy >= 0 && gy < GRID) {
             const key = `${gx},${gy}`;
             fireCells.add(key);
+            burntGrass.set(key, 12000);
+          }
+        }
+      }
+    }
 
-            if (Math.random() < 0.12 && spreadingFlames.size < 20) {
+    // "Khi núi lửa tràn kế bên nó sẽ sinh ra lửa đốt chứ đâu phải random tùy chỗ"
+    // Dung nham tràn qua để lại vệt lửa bốc cháy dọc theo rìa sau và bên cạnh dòng nham
+    const trailPos = fw.frontPos - fw.thickness;
+    if (trailPos >= 0 && trailPos < fw.maxDistance) {
+      if (!fw.isDiag) {
+        for (let r = 0; r < GRID; r++) {
+          if (Math.random() < 0.28 && spreadingFlames.size < 24) {
+            let gx, gy;
+            if (fw.dir === 'left') { gx = trailPos; gy = r; }
+            else if (fw.dir === 'right') { gx = GRID - 1 - trailPos; gy = r; }
+            else if (fw.dir === 'top') { gx = r; gy = trailPos; }
+            else { gx = r; gy = GRID - 1 - trailPos; }
+
+            const key = `${gx},${gy}`;
+            if (!spreadingFlames.has(key) && !puddleCells.has(key)) {
+              spreadingFlames.set(key, {
+                x: gx, y: gy,
+                life: 4500 + Math.random() * 2500, maxLife: 7000,
+                gen: 0,
+                spreadTimer: 700 + Math.random() * 400
+              });
+              spawnFireSparks(gx, gy);
+            }
+          }
+        }
+      } else {
+        for (let i = 0; i < GRID; i++) {
+          if (Math.random() < 0.28 && spreadingFlames.size < 24) {
+            let gx, gy;
+            if (fw.dir === 'diag-tl') { gx = i; gy = trailPos - i; }
+            else if (fw.dir === 'diag-tr') { gx = GRID - 1 - i; gy = trailPos - i; }
+            else if (fw.dir === 'diag-bl') { gx = i; gy = GRID - 1 - (trailPos - i); }
+            else { gx = GRID - 1 - i; gy = GRID - 1 - (trailPos - i); }
+
+            if (gx >= 0 && gx < GRID && gy >= 0 && gy < GRID) {
+              const key = `${gx},${gy}`;
               if (!spreadingFlames.has(key) && !puddleCells.has(key)) {
                 spreadingFlames.set(key, {
                   x: gx, y: gy,
-                  life: 3800 + Math.random() * 2500, maxLife: 6500,
+                  life: 4500 + Math.random() * 2500, maxLife: 7000,
                   gen: 0,
                   spreadTimer: 700 + Math.random() * 400
                 });
+                spawnFireSparks(gx, gy);
               }
             }
-            burntGrass.set(key, 12000);
           }
         }
       }
@@ -1535,19 +1547,11 @@ function updateFireWave(dt) {
     if (fw.frontPos >= fw.maxDistance) {
       fireWave.state = 'burning';
       fireWave.stateTime = 0;
-      // Khi sóng dung nham tràn qua hết, để lại thêm vài đốm lửa tàn tích cháy rực khắp sân
-      spawnRandomVolcanoFire(2 + Math.floor(Math.random() * 3));
     }
     return;
   }
 
   if (fireWave.state === 'burning') {
-    fireWave.emberTimer = (fireWave.emberTimer || 0) + dt;
-    if (fireWave.emberTimer >= 600) {
-      fireWave.emberTimer -= 600;
-      spawnRandomVolcanoFire(1);
-    }
-
     if (fireWave.stateTime >= FIRE_BURN_TIME) {
       fireWave = null;
       fireCells = new Set();
@@ -1566,7 +1570,7 @@ function updateSpreadingFlames(dt) {
       f.spreadTimer = 1200 + Math.random() * 600;
 
       if (Math.random() < 0.12) {
-        const dirs = [{x:1,y:0},{x:-1,y:0},{x:0,y:1},{x:0,y:-1}];
+        const dirs = [{ x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 }];
         const ad = dirs[Math.floor(Math.random() * dirs.length)];
         const nx = f.x + ad.x;
         const ny = f.y + ad.y;
@@ -1705,7 +1709,7 @@ function startThunderstorm() {
 function spreadWaterPuddles() {
   if (puddleCells.size >= 45) return;
   const newPuddles = new Set(puddleCells);
-  const dirs = [{x:1,y:0},{x:-1,y:0},{x:0,y:1},{x:0,y:-1}];
+  const dirs = [{ x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 }];
 
   for (const p of puddleCells) {
     if (Math.random() < 0.45) {
@@ -2210,9 +2214,9 @@ function startBombEvent() {
 
   // Divide map into 4 quadrants for wide dispersal across the arena
   const sectors = [
-    { minX: 1, maxX: 8,  minY: 1, maxY: 8 },
+    { minX: 1, maxX: 8, minY: 1, maxY: 8 },
     { minX: 11, maxX: 18, minY: 1, maxY: 8 },
-    { minX: 1, maxX: 8,  minY: 11, maxY: 18 },
+    { minX: 1, maxX: 8, minY: 11, maxY: 18 },
     { minX: 11, maxX: 18, minY: 11, maxY: 18 },
   ].sort(() => Math.random() - 0.5);
 
@@ -2474,14 +2478,14 @@ function loop(now) {
 function updateMovement(dt) {
   if (trapFrozenTimer > 0 || isSpectator) return;
 
-  // Determine directional input from held keyboard keys
+  // Determine directional input from held keyboard keys (WASD / Arrows)
   let inputX = 0;
   let inputY = 0;
 
-  if (keysDown.has('ArrowUp') || keysDown.has('w') || keysDown.has('W')) inputY -= 1;
-  if (keysDown.has('ArrowDown') || keysDown.has('s') || keysDown.has('S')) inputY += 1;
-  if (keysDown.has('ArrowLeft') || keysDown.has('a') || keysDown.has('A')) inputX -= 1;
-  if (keysDown.has('ArrowRight') || keysDown.has('d') || keysDown.has('D')) inputX += 1;
+  if (keysDown.has('up')) inputY -= 1;
+  if (keysDown.has('down')) inputY += 1;
+  if (keysDown.has('left')) inputX -= 1;
+  if (keysDown.has('right')) inputX += 1;
 
   if (inputX !== 0 || inputY !== 0) {
     const len = Math.hypot(inputX, inputY);
@@ -2489,6 +2493,7 @@ function updateMovement(dt) {
     dir.y = inputY / len;
     nextDir.x = dir.x;
     nextDir.y = dir.y;
+    player.angle = Math.atan2(dir.y, dir.x);
   } else if (joystickActive && (dir.x !== 0 || dir.y !== 0)) {
     // Joystick is currently held active by mobile user
   } else {
@@ -2879,7 +2884,7 @@ function initLawnCanvas() {
   const lctx = lawnCanvas.getContext('2d');
 
   const grassLight = '#2d6b2e';
-  const grassDark  = '#256126';
+  const grassDark = '#256126';
 
   for (let gx = 0; gx < GRID; gx++) {
     for (let gy = 0; gy < GRID; gy++) {
@@ -3719,15 +3724,15 @@ function drawFireWarningEdge() {
     ctx.fillText(fireWave.isFullSweep ? '▲▲ BÃO LỬA: QUÉT HẾT! ▲▲' : '▲▲ CẢNH BÁO: NÉ LÊN ▲▲', CANVAS_PX / 2, bounceY - 30);
   } else {
     // Diagonal warnings
-    const corner = d === 'diag-tl' ? [0,0] : d === 'diag-tr' ? [CANVAS_PX,0] : d === 'diag-bl' ? [0,CANVAS_PX] : [CANVAS_PX,CANVAS_PX];
+    const corner = d === 'diag-tl' ? [0, 0] : d === 'diag-tr' ? [CANVAS_PX, 0] : d === 'diag-bl' ? [0, CANVAS_PX] : [CANVAS_PX, CANVAS_PX];
     grd = ctx.createRadialGradient(corner[0], corner[1], 10, corner[0], corner[1], CANVAS_PX * 0.8);
     grd.addColorStop(0, `rgba(255, 23, 68, ${pulse * 0.8})`);
     grd.addColorStop(0.7, `rgba(255, 145, 0, ${pulse * 0.25})`);
     grd.addColorStop(1, 'transparent');
     ctx.fillStyle = grd;
     ctx.fillRect(0, 0, CANVAS_PX, CANVAS_PX);
-    const arrowMap = {'diag-tl':'↘','diag-tr':'↙','diag-bl':'↗','diag-br':'↖'};
-    const posMap = {'diag-tl':[150,110],'diag-tr':[CANVAS_PX-150,110],'diag-bl':[150,CANVAS_PX-110],'diag-br':[CANVAS_PX-150,CANVAS_PX-110]};
+    const arrowMap = { 'diag-tl': '↘', 'diag-tr': '↙', 'diag-bl': '↗', 'diag-br': '↖' };
+    const posMap = { 'diag-tl': [150, 110], 'diag-tr': [CANVAS_PX - 150, 110], 'diag-bl': [150, CANVAS_PX - 110], 'diag-br': [CANVAS_PX - 150, CANVAS_PX - 110] };
     const pp = posMap[d];
     ctx.fillStyle = '#fff'; ctx.font = '800 15px Inter, sans-serif'; ctx.textAlign = 'center';
     ctx.shadowColor = 'rgba(255, 23, 68, 0.9)'; ctx.shadowBlur = 14;
@@ -4056,13 +4061,22 @@ function drawPauseOverlay() {
   ctx.textAlign = 'start';
 }
 
-// ── Controls ──────────────────────────────────
-const DIR_MAP = {
-  ArrowUp:    { x:  0, y: -1 }, w: { x:  0, y: -1 }, W: { x:  0, y: -1 },
-  ArrowDown:  { x:  0, y:  1 }, s: { x:  0, y:  1 }, S: { x:  0, y:  1 },
-  ArrowLeft:  { x: -1, y:  0 }, a: { x: -1, y:  0 }, A: { x: -1, y:  0 },
-  ArrowRight: { x:  1, y:  0 }, d: { x:  1, y:  0 }, D: { x:  1, y:  0 },
-};
+// ── Controls: PC Di chuyển khi nhấn giữ, nhả ra là đứng yên ──
+function getMovementDirName(e) {
+  const code = e.code;
+  if (code === 'KeyW' || code === 'ArrowUp') return 'up';
+  if (code === 'KeyS' || code === 'ArrowDown') return 'down';
+  if (code === 'KeyA' || code === 'ArrowLeft') return 'left';
+  if (code === 'KeyD' || code === 'ArrowRight') return 'right';
+
+  const k = (e.key || '').toLowerCase();
+  if (k === 'w' || k === 'arrowup' || k === 'ư') return 'up';
+  if (k === 's' || k === 'arrowdown') return 'down';
+  if (k === 'a' || k === 'arrowleft') return 'left';
+  if (k === 'd' || k === 'arrowright') return 'right';
+
+  return null;
+}
 
 document.addEventListener('keydown', e => {
   // ESC key: Thoát ra Menu chính ở bất kỳ màn hình nào
@@ -4111,11 +4125,10 @@ document.addEventListener('keydown', e => {
     return;
   }
 
-  const newDir = DIR_MAP[e.key];
-  if (newDir && running && !paused && trapFrozenTimer <= 0) {
+  const moveDir = getMovementDirName(e);
+  if (moveDir && running && !paused && trapFrozenTimer <= 0) {
     e.preventDefault();
-    keysDown.add(e.key);
-    nextDir = newDir;
+    keysDown.add(moveDir);
   }
 });
 
@@ -4124,6 +4137,8 @@ function exitToMainMenu() {
   paused = false;
   isCountingDown = false;
   keysDown.clear();
+  dir = { x: 0, y: 0 };
+  nextDir = { x: 0, y: 0 };
   if (loopId) {
     cancelAnimationFrame(loopId);
     loopId = null;
@@ -4147,13 +4162,39 @@ function exitToMainMenu() {
 window.exitToMainMenu = exitToMainMenu;
 
 document.addEventListener('keyup', e => {
-  if (DIR_MAP[e.key]) {
-    keysDown.delete(e.key);
+  const moveDir = getMovementDirName(e);
+  if (moveDir) {
+    keysDown.delete(moveDir);
+  }
+  // "chơi game pc khi điều khiển nút mới có thể di chuyển, còn nếu không sẽ đứng yên giống bên chơi điện thoại"
+  if (keysDown.size === 0 && !joystickActive) {
+    dir.x = 0;
+    dir.y = 0;
+    nextDir.x = 0;
+    nextDir.y = 0;
   }
 });
 
 window.addEventListener('blur', () => {
   keysDown.clear();
+  if (!joystickActive) {
+    dir.x = 0;
+    dir.y = 0;
+    nextDir.x = 0;
+    nextDir.y = 0;
+  }
+});
+
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    keysDown.clear();
+    if (!joystickActive) {
+      dir.x = 0;
+      dir.y = 0;
+      nextDir.x = 0;
+      nextDir.y = 0;
+    }
+  }
 });
 
 // Canvas pointerdown & click to aim & shoot directly with mouse
@@ -4188,10 +4229,10 @@ window.togglePause = togglePause;
 function changeDir(d) {
   if (trapFrozenTimer > 0) return;
   const map = {
-    up:    { x:  0, y: -1 },
-    down:  { x:  0, y:  1 },
-    left:  { x: -1, y:  0 },
-    right: { x:  1, y:  0 },
+    up: { x: 0, y: -1 },
+    down: { x: 0, y: 1 },
+    left: { x: -1, y: 0 },
+    right: { x: 1, y: 0 },
   };
   const nd = map[d];
   if (nd && running && !paused) {
@@ -4321,7 +4362,7 @@ function initVirtualJoystick() {
     base.classList.remove('active');
     knob.style.transition = 'transform 0.16s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
     knob.style.transform = 'translate(0px, 0px)';
-    
+
     // Stop moving when finger is lifted from joystick
     dir.x = 0;
     dir.y = 0;
@@ -4406,7 +4447,7 @@ function registerActiveRoom(code, hostName) {
       updatedAt: Date.now()
     };
     localStorage.setItem('disaster_active_rooms', JSON.stringify(rooms));
-  } catch (e) {}
+  } catch (e) { }
 }
 
 function updateActiveRoomPlayerCount(code, count) {
@@ -4417,7 +4458,7 @@ function updateActiveRoomPlayerCount(code, count) {
       rooms[code].updatedAt = Date.now();
       localStorage.setItem('disaster_active_rooms', JSON.stringify(rooms));
     }
-  } catch (e) {}
+  } catch (e) { }
 }
 
 function removeActiveRoom(code) {
@@ -4425,7 +4466,7 @@ function removeActiveRoom(code) {
     const rooms = getActiveRooms();
     delete rooms[code];
     localStorage.setItem('disaster_active_rooms', JSON.stringify(rooms));
-  } catch (e) {}
+  } catch (e) { }
 }
 
 function getActiveRooms() {
@@ -4479,21 +4520,25 @@ function createOnlineRoom() {
 
 function joinOnlineRoom() {
   const nameInput = elOnlinePlayerName.value.trim();
-  const codeInput = elInputRoomCode.value.trim().toUpperCase();
+  const codeInput = (elInputRoomCode.value || '').trim().toUpperCase();
 
+  // "chỉnh giới hạn nhập 4 ký tự mã phòng, nếu quá 4 hoặc thấp hơn 4 sẽ không hợp lệ"
   if (!codeInput || codeInput.length !== 4) {
-    showOnlineError('Mã phòng phải gồm đúng 4 ký tự!');
+    showOnlineError('Mã phòng không hợp lệ (phải có đúng 4 ký tự)!');
+    showToast('⚠️ Mã phòng phải có đúng 4 ký tự!');
     return;
   }
 
-  // Check known rooms for existence and room capacity
+  // Check known rooms on client
   const activeRooms = getActiveRooms();
-  if (!activeRooms[codeInput]) {
-    showOnlineError('Mã phòng không tồn tại hoặc chủ phòng đã thoát!');
+  if (Object.keys(activeRooms).length > 0 && !activeRooms[codeInput]) {
+    showOnlineError('Mã phòng không tồn tại! Chỉ người tạo phòng mới sinh ra phòng chơi.');
+    showToast('❌ Mã phòng không tồn tại!');
     return;
   }
-  if (activeRooms[codeInput].playerCount >= 4) {
+  if (activeRooms[codeInput] && activeRooms[codeInput].playerCount >= 4) {
     showOnlineError('Phòng đã đầy người (4/4), bạn không thể vô!');
+    showToast('⚠️ Phòng đã đầy người (4/4)!');
     return;
   }
 
@@ -4508,7 +4553,7 @@ function joinOnlineRoom() {
     name: myPlayerName,
     slot: 1,
     isHost: false,
-    ready: false, // Guests start as NOT ready
+    ready: false,
     isAlive: true,
     hp: MAX_HP,
     isFrozen: false,
@@ -4516,6 +4561,13 @@ function joinOnlineRoom() {
     time: 0,
     skinId: equippedSkinId,
   }];
+
+  const btn = document.getElementById('btnJoinOnline');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span>Đang kết nối...</span>';
+  }
+  showOnlineStatus(`⏳ Đang kiểm tra mã phòng "${codeInput}"...`);
 
   initNetwork(currentRoomCode);
 
@@ -4526,25 +4578,49 @@ function joinOnlineRoom() {
     skinId: equippedSkinId,
   });
 
-  enterLobbyView();
+  // Lưu ý: KHÔNG gọi enterLobbyView() ở đây! Chỉ vào lobby khi Host phản hồi ROOM_UPDATE
 
   // Watchdog timeout: if host doesn't respond or room doesn't exist
   if (joinWatchdogTimer) clearTimeout(joinWatchdogTimer);
   joinWatchdogTimer = setTimeout(() => {
-    if (roomPlayers.length <= 1 && !isHost && isMultiplayer) {
+    if (!isHost && isMultiplayer) {
       leaveOnlineRoom();
       elOverOnline.classList.remove('hidden');
       elViewOnlineMenu.classList.remove('hidden');
       elViewOnlineLobby.classList.add('hidden');
       elOverStart.classList.add('hidden');
-      showOnlineError('Mã phòng không tồn tại hoặc chủ phòng đã thoát!');
+      resetJoinButtonUI();
+      showOnlineError('Mã phòng không tồn tại hoặc chủ phòng đã thoát! Chỉ người tạo phòng mới sinh ra phòng chơi.');
+      showToast('❌ Không tìm thấy phòng ' + codeInput + '!');
     }
-  }, 4000);
+  }, 2800);
+}
+
+function showOnlineStatus(msg) {
+  if (elOnlineError) {
+    elOnlineError.textContent = msg;
+    elOnlineError.className = 'online-error-msg status';
+    elOnlineError.classList.remove('hidden');
+  }
 }
 
 function showOnlineError(msg) {
-  elOnlineError.textContent = msg;
-  elOnlineError.classList.remove('hidden');
+  if (elOnlineError) {
+    elOnlineError.textContent = msg;
+    elOnlineError.className = 'online-error-msg';
+    elOnlineError.classList.remove('hidden');
+  }
+}
+
+function resetJoinButtonUI() {
+  const btn = document.getElementById('btnJoinOnline');
+  if (btn) {
+    btn.disabled = false;
+    btn.innerHTML = `
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="8" cy="12" r="4"/><path d="M12 12h8v3h-3v2h-2"/></svg>
+      <span>Vào phòng</span>
+    `;
+  }
 }
 
 function copyRoomCode() {
@@ -4760,10 +4836,10 @@ function updateMultiHud() {
       if (p.isAlive) {
         badge.classList.remove('dead');
         if (iconEl) {
-          iconEl.innerHTML = p.isHost 
-            ? '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#ffd700" stroke-width="2.2"><path d="M2 4l3 12h14l3-12-5 4-5-6-5 6z"/></svg>' 
-            : (p.isFrozen 
-              ? '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#67e8f9" stroke-width="2.2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>' 
+          iconEl.innerHTML = p.isHost
+            ? '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#ffd700" stroke-width="2.2"><path d="M2 4l3 12h14l3-12-5 4-5-6-5 6z"/></svg>'
+            : (p.isFrozen
+              ? '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#67e8f9" stroke-width="2.2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>'
               : '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#4ade80" stroke-width="2.2"><circle cx="12" cy="7" r="4"/><path d="M6 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/></svg>');
         }
       } else {
@@ -4783,6 +4859,7 @@ function leaveOnlineRoom() {
     clearTimeout(joinWatchdogTimer);
     joinWatchdogTimer = null;
   }
+  resetJoinButtonUI();
   if (roomHeartbeatTimer) {
     clearInterval(roomHeartbeatTimer);
     roomHeartbeatTimer = null;
@@ -4792,17 +4869,23 @@ function leaveOnlineRoom() {
   }
   if (broadcastChannel) {
     try {
-      broadcastNetworkMessage({ type: 'LEAVE', id: myPlayerId, slot: mySlot });
+      broadcastNetworkMessage({
+        type: isHost ? 'ROOM_CLOSED' : 'LEAVE',
+        id: myPlayerId,
+        slot: mySlot,
+        isHost: isHost,
+        reason: 'Chủ phòng đã thoát, phòng đã bị giải tán!'
+      });
       broadcastChannel.close();
-    } catch (e) {}
+    } catch (e) { }
     broadcastChannel = null;
   }
   for (const conn of peerConnections) {
-    try { conn.close(); } catch (e) {}
+    try { conn.close(); } catch (e) { }
   }
   peerConnections = [];
   if (peer) {
-    try { peer.destroy(); } catch (e) {}
+    try { peer.destroy(); } catch (e) { }
     peer = null;
   }
 
@@ -4881,6 +4964,35 @@ function initNetwork(roomCode) {
             conn.send({ type: 'JOIN_REQUEST', id: myPlayerId, name: myPlayerName, skinId: equippedSkinId });
           });
           conn.on('data', (data) => handleNetworkMessage(data));
+          conn.on('close', () => {
+            if (!isHost && isMultiplayer) {
+              leaveOnlineRoom();
+              elOverOnline.classList.remove('hidden');
+              elViewOnlineMenu.classList.remove('hidden');
+              elViewOnlineLobby.classList.add('hidden');
+              showOnlineError('Chủ phòng đã thoát hoặc ngắt kết nối!');
+              showToast('⚠️ Chủ phòng đã thoát! Phòng đã bị đóng.');
+            }
+          });
+        }
+      });
+
+      peer.on('error', (err) => {
+        console.warn('PeerJS error:', err);
+        if (err.type === 'peer-unavailable') {
+          if (!isHost) {
+            if (joinWatchdogTimer) {
+              clearTimeout(joinWatchdogTimer);
+              joinWatchdogTimer = null;
+            }
+            leaveOnlineRoom();
+            resetJoinButtonUI();
+            elOverOnline.classList.remove('hidden');
+            elViewOnlineMenu.classList.remove('hidden');
+            elViewOnlineLobby.classList.add('hidden');
+            showOnlineError('Mã phòng không tồn tại! Chỉ người tạo phòng mới sinh ra phòng chơi.');
+            showToast('❌ Mã phòng không tồn tại!');
+          }
         }
       });
 
@@ -4899,11 +5011,11 @@ function initNetwork(roomCode) {
 
 function broadcastNetworkMessage(msg, excludeConn = null) {
   if (broadcastChannel) {
-    try { broadcastChannel.postMessage(msg); } catch (e) {}
+    try { broadcastChannel.postMessage(msg); } catch (e) { }
   }
   for (const conn of peerConnections) {
     if (conn !== excludeConn && conn.open) {
-      try { conn.send(msg); } catch (e) {}
+      try { conn.send(msg); } catch (e) { }
     }
   }
 }
@@ -4972,9 +5084,11 @@ function handleNetworkMessage(msg) {
         clearTimeout(joinWatchdogTimer);
         joinWatchdogTimer = null;
       }
+      resetJoinButtonUI();
       roomPlayers = msg.players || [];
       const me = roomPlayers.find(p => p.id === myPlayerId);
       if (me) mySlot = me.slot;
+      enterLobbyView();
       updateLobbyUI();
       break;
     }
@@ -5065,7 +5179,26 @@ function handleNetworkMessage(msg) {
 
     case 'MATCH_OVER': { showMultiplayerGameOver(msg.leaderboard); break; }
 
+    case 'ROOM_CLOSED': {
+      leaveOnlineRoom();
+      elOverOnline.classList.remove('hidden');
+      elViewOnlineMenu.classList.remove('hidden');
+      elViewOnlineLobby.classList.add('hidden');
+      showOnlineError(msg.reason || 'Chủ phòng đã thoát, phòng đã bị giải tán!');
+      showToast('⚠️ ' + (msg.reason || 'Chủ phòng đã thoát! Phòng đã bị đóng.'));
+      break;
+    }
+
     case 'LEAVE': {
+      if (msg.isHost) {
+        leaveOnlineRoom();
+        elOverOnline.classList.remove('hidden');
+        elViewOnlineMenu.classList.remove('hidden');
+        elViewOnlineLobby.classList.add('hidden');
+        showOnlineError('Chủ phòng đã thoát, phòng đã bị giải tán!');
+        showToast('⚠️ Chủ phòng đã thoát! Phòng đã bị đóng.');
+        break;
+      }
       roomPlayers = roomPlayers.filter(pl => pl.id !== msg.id);
       updateLobbyUI();
       break;
@@ -5179,7 +5312,7 @@ function showMultiplayerGameOver(leaderboard) {
     const row = document.createElement('div');
     row.className = 'lb-row';
     const isWinner = idx === 0 && p.isAlive;
-    const rankBadge = isWinner 
+    const rankBadge = isWinner
       ? '<span class="lb-badge-winner" style="display:inline-flex;align-items:center;gap:4px;color:#ffd700;font-weight:800"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 9H4a2 2 0 0 1-2-2V5h4m14 4h2a2 2 0 0 0 2-2V5h-4M6 5h12v6a6 6 0 0 1-12 0V5zm4 10v4m4-4v4m-6 0h8"/></svg>#1 TOP</span>'
       : `<span class="lb-rank" style="font-weight:800;color:${idx === 1 ? '#94a3b8' : idx === 2 ? '#b45309' : '#64748b'}">#${idx + 1}</span>`;
 
@@ -5201,3 +5334,10 @@ function showMultiplayerGameOver(leaderboard) {
 
   elOverMultiGO.classList.remove('hidden');
 }
+
+window.addEventListener('beforeunload', () => {
+  if (isMultiplayer) {
+    leaveOnlineRoom();
+  }
+});
+
