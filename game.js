@@ -170,10 +170,47 @@ const elDisplayPlayerCount= document.getElementById('displayPlayerCount');
 const elPlayerSlots       = document.getElementById('playerSlotsContainer');
 const elBtnStartMultiGame = document.getElementById('btnStartMultiGame');
 const elGuestWaitingMsg   = document.getElementById('guestWaitingMsg');
+const elBtnToggleReady    = document.getElementById('btnToggleReady');
+const elTextToggleReady   = document.getElementById('textToggleReady');
+const elLobbyNoticeBar    = document.getElementById('lobbyNoticeBar');
+const elTextStartMulti    = document.getElementById('textStartMulti');
+const elRoomInviteHint    = document.getElementById('roomInviteHint');
 const elResRoomCode       = document.getElementById('resRoomCode');
 const elLeaderboardList   = document.getElementById('leaderboardList');
 const elBtnHostPlayAgain  = document.getElementById('btnHostPlayAgain');
 const elModeSubtitle      = document.getElementById('modeSubtitle');
+
+// Internal Canvas Camera Shake (Pure 2D context offset - NO DOM text jumping!)
+let camShakeTimer = 0;
+let camShakeIntensity = 0;
+
+function triggerScreenShake(intensity = 3, duration = 200) {
+  camShakeIntensity = Math.max(camShakeIntensity, intensity);
+  camShakeTimer = Math.max(camShakeTimer, duration);
+}
+
+// Light Atmospheric Fog System
+const FOG_COUNT = 14;
+let fogPuffs = [];
+
+function initFog() {
+  fogPuffs = [];
+  for (let i = 0; i < FOG_COUNT; i++) {
+    fogPuffs.push({
+      x: Math.random() * CANVAS_PX,
+      y: Math.random() * CANVAS_PX,
+      radius: 55 + Math.random() * 45,
+      vx: 0.12 + Math.random() * 0.18,
+      vy: (Math.random() - 0.5) * 0.08,
+      baseAlpha: 0.13 + Math.random() * 0.09,
+      phase: Math.random() * Math.PI * 2,
+      pulseSpeed: 0.001 + Math.random() * 0.0015,
+    });
+  }
+}
+
+let joinWatchdogTimer = null;
+let roomHeartbeatTimer = null;
 
 canvas.width  = CANVAS_PX;
 canvas.height = CANVAS_PX;
@@ -624,7 +661,7 @@ function startCountdown(onComplete) {
     } else if (count === 0) {
       elCountdownNum.textContent = 'BẮT ĐẦU!';
       elCountdownNum.classList.add('go');
-      elCountdownSub.textContent = 'CHẠY THOÁT THIÊN TAI!';
+      elCountdownSub.textContent = 'CHẠY NGAY ĐI!';
       elCountdownNum.style.animation = 'none';
       void elCountdownNum.offsetWidth;
       elCountdownNum.style.animation = '';
@@ -675,8 +712,7 @@ function takeDamage(amount, reason) {
   spawnDamageParticles(player.x, player.y);
   spawnFloatingText(`-${amount} HP`, player.x, player.y, '#ff1744');
 
-  wrapper.classList.add('shake');
-  setTimeout(() => wrapper.classList.remove('shake'), 250);
+  triggerScreenShake(2.2, 160);
 
   if (hp <= 0) {
     handlePlayerDeath(reason);
@@ -820,9 +856,7 @@ function shootGun(targetX, targetY) {
 
   spawnFloatingText('BẮN!', player.x, player.y, '#ffab40');
 
-  // Screen flash effect
-  wrapper.classList.add('shake');
-  setTimeout(() => wrapper.classList.remove('shake'), 150);
+  // Subtle gun muzzle flash (No screen shake on gun shoot to prevent text jumping)
 
   if (isMultiplayer) {
     broadcastNetworkMessage({
@@ -1066,8 +1100,7 @@ function explodeLandmine(mine) {
   const my = mine.y;
 
   spawnExplosionParticles(mx, my);
-  wrapper.classList.add('shake');
-  setTimeout(() => wrapper.classList.remove('shake'), 400);
+  triggerScreenShake(3.0, 220);
 
   const blastRadius = 2;
   const px = player.x;
@@ -1572,8 +1605,7 @@ function updateThunderstorm(dt) {
       thunderstorm.stateTime = 0;
       thunderstorm.flashAlpha = 0.85;
 
-      wrapper.classList.add('shake');
-      setTimeout(() => wrapper.classList.remove('shake'), 400);
+      triggerScreenShake(2.5, 200);
 
       electrifiedPuddles = new Set();
       let hitWater = false;
@@ -1716,8 +1748,7 @@ function updateTornado(dt) {
     if (isTornadoConverging) {
       isTornadoConverging = false;
       tornadoConvergenceTimer = 0;
-      wrapper.classList.add('shake');
-      setTimeout(() => wrapper.classList.remove('shake'), 350);
+      triggerScreenShake(2.0, 180);
       for (const t of tornadoes) {
         t.vx *= -2.2;
         t.vy *= -2.2;
@@ -1737,8 +1768,7 @@ function updateTornado(dt) {
         t.state = 'active';
         t.stateTime = 0;
         if (i === 0) {
-          wrapper.classList.add('shake');
-          setTimeout(() => wrapper.classList.remove('shake'), 300);
+          triggerScreenShake(1.6, 140);
         }
       }
       continue;
@@ -1902,8 +1932,7 @@ function updateLandslide(dt) {
       landslide.state = 'collapsed';
       landslide.stateTime = 0;
 
-      wrapper.classList.add('shake');
-      setTimeout(() => wrapper.classList.remove('shake'), 400);
+      triggerScreenShake(2.0, 180);
 
       sinkholeCells = new Set();
       for (const z of landslide.zones) {
@@ -2051,8 +2080,7 @@ function explodeBomb(bomb) {
   craters.push({ cells, timeLeft: BOMB_CRATER_DURATION, flash: 1.0 });
   spawnExplosionParticles(bomb.x, bomb.y);
 
-  wrapper.classList.add('shake');
-  setTimeout(() => wrapper.classList.remove('shake'), 320);
+  triggerScreenShake(3.2, 220);
 }
 
 function spawnExplosionParticles(gx, gy) {
@@ -2146,6 +2174,13 @@ function loop(now) {
 
   if (damageCooldown > 0) damageCooldown -= dt;
   if (trapFrozenTimer > 0) trapFrozenTimer -= dt;
+  if (camShakeTimer > 0) {
+    camShakeTimer -= dt;
+    if (camShakeTimer <= 0) {
+      camShakeTimer = 0;
+      camShakeIntensity = 0;
+    }
+  }
 
   for (const t of placedTraps) {
     if (t.armTimer > 0) t.armTimer -= dt;
@@ -2486,6 +2521,16 @@ function gameOverSolo(reason) {
 function draw() {
   ctx.clearRect(0, 0, CANVAS_PX, CANVAS_PX);
 
+  const isShaking = camShakeTimer > 0;
+  if (isShaking) {
+    ctx.save();
+    const decay = camShakeTimer / 250;
+    const curInt = camShakeIntensity * Math.min(1, decay);
+    const sx = (Math.random() - 0.5) * curInt * 2;
+    const sy = (Math.random() - 0.5) * curInt * 2;
+    ctx.translate(sx, sy);
+  }
+
   drawGrassLawn();
   drawWaterPuddles();
   drawSinkholes();
@@ -2508,7 +2553,61 @@ function draw() {
   drawLandslideWarning();
   drawThunderstorm();
 
+  // Sương mù che mờ nhẹ (Atmospheric Light Mist)
+  drawAtmosphericFog();
+
+  if (isShaking) {
+    ctx.restore();
+  }
+
   if (paused) drawPauseOverlay();
+}
+
+function drawAtmosphericFog() {
+  if (fogPuffs.length === 0) initFog();
+
+  const px = (player && typeof player.x === 'number') ? (player.x * CELL + CELL / 2) : (CANVAS_PX / 2);
+  const py = (player && typeof player.y === 'number') ? (player.y * CELL + CELL / 2) : (CANVAS_PX / 2);
+  const now = performance.now();
+
+  // 1. Drifting soft mist puffs
+  for (let i = 0; i < fogPuffs.length; i++) {
+    const f = fogPuffs[i];
+    f.x += f.vx;
+    f.y += f.vy;
+    if (f.x - f.radius > CANVAS_PX) f.x = -f.radius;
+    if (f.y - f.radius > CANVAS_PX) f.y = -f.radius;
+    if (f.y + f.radius < 0) f.y = CANVAS_PX + f.radius;
+
+    const alpha = f.baseAlpha * (0.8 + 0.2 * Math.sin(now * f.pulseSpeed + f.phase));
+
+    // Distance to player: keep clear vision circle around player
+    const dist = Math.hypot(f.x - px, f.y - py);
+    let clearFactor = 1.0;
+    if (dist < 75) {
+      clearFactor = Math.max(0.08, (dist - 20) / 55);
+    }
+
+    const grad = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, f.radius);
+    grad.addColorStop(0, `rgba(215, 230, 245, ${alpha * clearFactor})`);
+    grad.addColorStop(0.65, `rgba(190, 210, 230, ${alpha * 0.55 * clearFactor})`);
+    grad.addColorStop(1, 'rgba(170, 195, 220, 0)');
+
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(f.x, f.y, f.radius, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // 2. Global atmospheric ambient haze with clear vision circle around the player
+  const vignette = ctx.createRadialGradient(px, py, 45, px, py, 260);
+  vignette.addColorStop(0, 'rgba(10, 18, 30, 0)');
+  vignette.addColorStop(0.35, 'rgba(12, 22, 38, 0.08)');
+  vignette.addColorStop(0.75, 'rgba(15, 28, 48, 0.20)');
+  vignette.addColorStop(1, 'rgba(15, 28, 48, 0.32)');
+
+  ctx.fillStyle = vignette;
+  ctx.fillRect(0, 0, CANVAS_PX, CANVAS_PX);
 }
 
 function initLawnCanvas() {
@@ -3873,8 +3972,6 @@ function openOnlineModal() {
 
 function closeOnlineModal() {
   leaveOnlineRoom();
-  elOverOnline.classList.add('hidden');
-  elOverStart.classList.remove('hidden');
 }
 
 function generateRoomCode() {
@@ -3882,6 +3979,53 @@ function generateRoomCode() {
   let code = '';
   for (let i = 0; i < 4; i++) code += chars[Math.floor(Math.random() * chars.length)];
   return code;
+}
+
+// ── Active Rooms Registry (Persistence & Room Discovery) ──
+function registerActiveRoom(code, hostName) {
+  try {
+    const rooms = getActiveRooms();
+    rooms[code] = {
+      code: code,
+      hostName: hostName,
+      playerCount: roomPlayers.length,
+      updatedAt: Date.now()
+    };
+    localStorage.setItem('disaster_active_rooms', JSON.stringify(rooms));
+  } catch (e) {}
+}
+
+function updateActiveRoomPlayerCount(code, count) {
+  try {
+    const rooms = getActiveRooms();
+    if (rooms[code]) {
+      rooms[code].playerCount = count;
+      rooms[code].updatedAt = Date.now();
+      localStorage.setItem('disaster_active_rooms', JSON.stringify(rooms));
+    }
+  } catch (e) {}
+}
+
+function removeActiveRoom(code) {
+  try {
+    const rooms = getActiveRooms();
+    delete rooms[code];
+    localStorage.setItem('disaster_active_rooms', JSON.stringify(rooms));
+  } catch (e) {}
+}
+
+function getActiveRooms() {
+  try {
+    const data = localStorage.getItem('disaster_active_rooms');
+    const parsed = data ? JSON.parse(data) : {};
+    const now = Date.now();
+    for (const k in parsed) {
+      if (now - parsed[k].updatedAt > 1800000) delete parsed[k]; // 30 min expiry
+    }
+    return parsed;
+  } catch (e) {
+    return {};
+  }
 }
 
 function createOnlineRoom() {
@@ -3906,6 +4050,15 @@ function createOnlineRoom() {
     skinId: equippedSkinId,
   }];
 
+  registerActiveRoom(currentRoomCode, myPlayerName);
+
+  if (roomHeartbeatTimer) clearInterval(roomHeartbeatTimer);
+  roomHeartbeatTimer = setInterval(() => {
+    if (isHost && currentRoomCode) {
+      updateActiveRoomPlayerCount(currentRoomCode, roomPlayers.length);
+    }
+  }, 3000);
+
   initNetwork(currentRoomCode);
   enterLobbyView();
 }
@@ -3919,10 +4072,32 @@ function joinOnlineRoom() {
     return;
   }
 
+  // Check known rooms for room capacity
+  const activeRooms = getActiveRooms();
+  if (activeRooms[codeInput] && activeRooms[codeInput].playerCount >= 4) {
+    showOnlineError('Phòng đã đầy người (4/4), bạn không thể vô!');
+    return;
+  }
+
   myPlayerName = nameInput || 'Khách';
   currentRoomCode = codeInput;
   isHost = false;
   isMultiplayer = true;
+  mySlot = 1;
+
+  roomPlayers = [{
+    id: myPlayerId,
+    name: myPlayerName,
+    slot: 1,
+    isHost: false,
+    ready: false, // Guests start as NOT ready
+    isAlive: true,
+    hp: MAX_HP,
+    isFrozen: false,
+    score: 0,
+    time: 0,
+    skinId: equippedSkinId,
+  }];
 
   initNetwork(currentRoomCode);
 
@@ -3934,6 +4109,19 @@ function joinOnlineRoom() {
   });
 
   enterLobbyView();
+
+  // Watchdog timeout: if host doesn't respond or room doesn't exist
+  if (joinWatchdogTimer) clearTimeout(joinWatchdogTimer);
+  joinWatchdogTimer = setTimeout(() => {
+    if (roomPlayers.length <= 1 && !isHost && isMultiplayer) {
+      leaveOnlineRoom();
+      elOverOnline.classList.remove('hidden');
+      elViewOnlineMenu.classList.remove('hidden');
+      elViewOnlineLobby.classList.add('hidden');
+      elOverStart.classList.add('hidden');
+      showOnlineError('Mã phòng không tồn tại hoặc chủ phòng đã đóng!');
+    }
+  }, 4500);
 }
 
 function showOnlineError(msg) {
@@ -3957,14 +4145,63 @@ function enterLobbyView() {
   elDisplayRoomCode.textContent = currentRoomCode;
 
   if (isHost) {
-    elBtnStartMultiGame.classList.remove('hidden');
-    elGuestWaitingMsg.classList.add('hidden');
+    if (elBtnStartMultiGame) {
+      elBtnStartMultiGame.classList.remove('hidden');
+      elBtnStartMultiGame.style.display = 'inline-flex';
+    }
+    if (elGuestWaitingMsg) {
+      elGuestWaitingMsg.classList.add('hidden');
+      elGuestWaitingMsg.style.display = 'none';
+    }
+    if (elBtnToggleReady) {
+      elBtnToggleReady.classList.add('hidden');
+      elBtnToggleReady.style.display = 'none';
+    }
   } else {
-    elBtnStartMultiGame.classList.add('hidden');
-    elGuestWaitingMsg.classList.remove('hidden');
+    if (elBtnStartMultiGame) {
+      elBtnStartMultiGame.classList.add('hidden');
+      elBtnStartMultiGame.style.display = 'none';
+    }
+    if (elGuestWaitingMsg) {
+      elGuestWaitingMsg.classList.remove('hidden');
+      elGuestWaitingMsg.style.display = 'block';
+    }
+    if (elBtnToggleReady) {
+      elBtnToggleReady.classList.remove('hidden');
+      elBtnToggleReady.style.display = 'inline-flex';
+    }
   }
 
   updateLobbyUI();
+}
+
+function togglePlayerReady() {
+  if (isHost) return;
+  const me = roomPlayers.find(p => p.id === myPlayerId);
+  if (!me) return;
+
+  me.ready = !me.ready;
+  updateReadyButtonUI(me.ready);
+
+  broadcastNetworkMessage({
+    type: 'PLAYER_READY_TOGGLE',
+    id: myPlayerId,
+    ready: me.ready
+  });
+
+  updateLobbyUI();
+}
+
+function updateReadyButtonUI(isReady) {
+  if (!elBtnToggleReady) return;
+  elBtnToggleReady.classList.remove('ready-state-yes', 'ready-state-no');
+  if (isReady) {
+    elBtnToggleReady.classList.add('ready-state-yes');
+    if (elTextToggleReady) elTextToggleReady.textContent = 'CHƯA SẴN SÀNG (HỦY)';
+  } else {
+    elBtnToggleReady.classList.add('ready-state-no');
+    if (elTextToggleReady) elTextToggleReady.textContent = 'SẴN SÀNG';
+  }
 }
 
 function updateLobbyUI() {
@@ -3977,14 +4214,22 @@ function updateLobbyUI() {
     card.className = `slot-card p${i} ${p ? '' : 'empty'}`;
 
     if (p) {
+      const isMe = p.id === myPlayerId;
+      let roleHtml = '';
+      if (p.isHost) {
+        roleHtml = `<span class="slot-role host"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" style="vertical-align:middle"><path d="M2 4l3 12h14l3-12-5 4-5-6-5 6z"/></svg> Host</span>`;
+      } else if (p.ready) {
+        roleHtml = `<span class="slot-role ready">✅ Sẵn sàng</span>`;
+      } else {
+        roleHtml = `<span class="slot-role not-ready">⏳ Chưa sẵn sàng</span>`;
+      }
+
       card.innerHTML = `
         <span class="slot-avatar">
           <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="7" r="4"/><path d="M5.5 21v-2a4.5 4.5 0 0 1 4.5-4.5h4a4.5 4.5 0 0 1 4.5 4.5v2"/></svg>
         </span>
-        <span class="slot-name">${p.name} ${p.id === myPlayerId ? '(Bạn)' : ''}</span>
-        <span class="slot-role ${p.isHost ? 'host' : 'guest'}">
-          ${p.isHost ? '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" style="vertical-align:middle;margin-right:4px"><path d="M2 4l3 12h14l3-12-5 4-5-6-5 6z"/></svg>Host' : 'Khách'}
-        </span>
+        <span class="slot-name">${p.name} ${isMe ? '(Bạn)' : ''}</span>
+        ${roleHtml}
       `;
     } else {
       card.innerHTML = `
@@ -3996,6 +4241,82 @@ function updateLobbyUI() {
       `;
     }
     elPlayerSlots.appendChild(card);
+  }
+
+  // Update Host Start Button and Ready Notice
+  if (isHost) {
+    if (elBtnToggleReady) {
+      elBtnToggleReady.classList.add('hidden');
+      elBtnToggleReady.style.display = 'none';
+    }
+    if (elBtnStartMultiGame) {
+      elBtnStartMultiGame.classList.remove('hidden');
+      elBtnStartMultiGame.style.display = 'inline-flex';
+    }
+    if (elGuestWaitingMsg) {
+      elGuestWaitingMsg.classList.add('hidden');
+      elGuestWaitingMsg.style.display = 'none';
+    }
+
+    const guests = roomPlayers.filter(p => !p.isHost);
+    if (guests.length === 0) {
+      elBtnStartMultiGame.disabled = false;
+      if (elTextStartMulti) elTextStartMulti.textContent = 'Bắt đầu chơi ngay';
+      if (elLobbyNoticeBar) {
+        elLobbyNoticeBar.className = 'lobby-notice-bar waiting';
+        elLobbyNoticeBar.textContent = 'Đang chờ thêm người chơi nhập mã phòng...';
+        elLobbyNoticeBar.classList.remove('hidden');
+      }
+    } else {
+      const unreadyGuests = guests.filter(p => !p.ready);
+      if (unreadyGuests.length > 0) {
+        // "nếu chưa sẵn sàng chủ sẽ không vào được chơi"
+        elBtnStartMultiGame.disabled = true;
+        if (elTextStartMulti) elTextStartMulti.textContent = 'Chờ người chơi sẵn sàng...';
+        if (elLobbyNoticeBar) {
+          elLobbyNoticeBar.className = 'lobby-notice-bar waiting';
+          elLobbyNoticeBar.textContent = `⏳ Còn ${unreadyGuests.length} người chơi chưa bấm SẴN SÀNG!`;
+          elLobbyNoticeBar.classList.remove('hidden');
+        }
+      } else {
+        elBtnStartMultiGame.disabled = false;
+        if (elTextStartMulti) elTextStartMulti.textContent = '🚀 Bắt đầu trận đấu';
+        if (elLobbyNoticeBar) {
+          elLobbyNoticeBar.className = 'lobby-notice-bar ready-all';
+          elLobbyNoticeBar.textContent = '✅ Tất cả người chơi đã sẵn sàng! Chủ phòng có thể bắt đầu.';
+          elLobbyNoticeBar.classList.remove('hidden');
+        }
+      }
+    }
+  } else {
+    // Guest view
+    if (elBtnToggleReady) {
+      elBtnToggleReady.classList.remove('hidden');
+      elBtnToggleReady.style.display = 'inline-flex';
+    }
+    if (elBtnStartMultiGame) {
+      elBtnStartMultiGame.classList.add('hidden');
+      elBtnStartMultiGame.style.display = 'none';
+    }
+    if (elGuestWaitingMsg) {
+      elGuestWaitingMsg.classList.remove('hidden');
+      elGuestWaitingMsg.style.display = 'block';
+    }
+
+    const me = roomPlayers.find(p => p.id === myPlayerId);
+    const myReady = me ? me.ready : false;
+    updateReadyButtonUI(myReady);
+
+    if (elLobbyNoticeBar) {
+      if (myReady) {
+        elLobbyNoticeBar.className = 'lobby-notice-bar ready-all';
+        elLobbyNoticeBar.textContent = '✅ Bạn đã sẵn sàng! Đang chờ Host bắt đầu trận đấu...';
+      } else {
+        elLobbyNoticeBar.className = 'lobby-notice-bar waiting';
+        elLobbyNoticeBar.textContent = '👉 Hãy bấm nút "SẴN SÀNG" bên dưới để Host có thể bắt đầu!';
+      }
+      elLobbyNoticeBar.classList.remove('hidden');
+    }
   }
 
   updateMultiHud();
@@ -4040,20 +4361,54 @@ function updateMultiHud() {
 }
 
 function leaveOnlineRoom() {
+  if (joinWatchdogTimer) {
+    clearTimeout(joinWatchdogTimer);
+    joinWatchdogTimer = null;
+  }
+  if (roomHeartbeatTimer) {
+    clearInterval(roomHeartbeatTimer);
+    roomHeartbeatTimer = null;
+  }
+  if (currentRoomCode) {
+    removeActiveRoom(currentRoomCode);
+  }
   if (broadcastChannel) {
-    broadcastNetworkMessage({ type: 'LEAVE', id: myPlayerId, slot: mySlot });
-    broadcastChannel.close();
+    try {
+      broadcastNetworkMessage({ type: 'LEAVE', id: myPlayerId, slot: mySlot });
+      broadcastChannel.close();
+    } catch (e) {}
     broadcastChannel = null;
   }
-  if (peer) { peer.destroy(); peer = null; }
+  for (const conn of peerConnections) {
+    try { conn.close(); } catch (e) {}
+  }
+  peerConnections = [];
+  if (peer) {
+    try { peer.destroy(); } catch (e) {}
+    peer = null;
+  }
+
   isMultiplayer = false;
   isHost = false;
+  currentRoomCode = null;
   roomPlayers = [];
+
   if (elMultiHud) elMultiHud.classList.add('hidden');
+  if (elViewOnlineLobby) elViewOnlineLobby.classList.add('hidden');
+  if (elViewOnlineMenu) elViewOnlineMenu.classList.remove('hidden');
+  if (elOverOnline) elOverOnline.classList.add('hidden');
+  if (elOverStart) elOverStart.classList.remove('hidden');
+  if (elOnlineError) elOnlineError.classList.add('hidden');
 }
 
 function hostStartMatch() {
   if (!isHost) return;
+  const guests = roomPlayers.filter(p => !p.isHost);
+  const unreadyGuests = guests.filter(p => !p.ready);
+  if (guests.length > 0 && unreadyGuests.length > 0) {
+    showToast('⚠️ Không thể bắt đầu! Còn người chơi chưa bấm SẴN SÀNG.');
+    return;
+  }
   broadcastNetworkMessage({ type: 'START_MATCH', speed: currentSpeed });
   startMultiMatchGame();
 }
@@ -4142,7 +4497,11 @@ function handleNetworkMessage(msg) {
     case 'JOIN_REQUEST': {
       if (isHost) {
         if (roomPlayers.length >= 4) {
-          broadcastNetworkMessage({ type: 'ROOM_FULL', targetId: msg.id });
+          broadcastNetworkMessage({
+            type: 'ROOM_FULL',
+            targetId: msg.id,
+            message: 'Phòng đã đầy người (4/4), bạn không thể vô!'
+          });
           return;
         }
         let existing = roomPlayers.find(p => p.id === msg.id);
@@ -4150,9 +4509,10 @@ function handleNetworkMessage(msg) {
           const slot = roomPlayers.length;
           roomPlayers.push({
             id: msg.id, name: msg.name, slot: slot, isHost: false,
-            ready: true, isAlive: true, hp: MAX_HP, isFrozen: false, score: 0, time: 0,
+            ready: false, isAlive: true, hp: MAX_HP, isFrozen: false, score: 0, time: 0,
             skinId: msg.skinId || 'default'
           });
+          updateActiveRoomPlayerCount(currentRoomCode, roomPlayers.length);
         }
         broadcastNetworkMessage({ type: 'ROOM_UPDATE', players: roomPlayers });
         updateLobbyUI();
@@ -4160,7 +4520,40 @@ function handleNetworkMessage(msg) {
       break;
     }
 
+    case 'PLAYER_READY_TOGGLE': {
+      const pl = roomPlayers.find(p => p.id === msg.id);
+      if (pl) {
+        pl.ready = !!msg.ready;
+        if (isHost) {
+          broadcastNetworkMessage({ type: 'ROOM_UPDATE', players: roomPlayers });
+        }
+        updateLobbyUI();
+      }
+      break;
+    }
+
+    case 'ROOM_FULL': {
+      if (msg.targetId === myPlayerId) {
+        if (joinWatchdogTimer) {
+          clearTimeout(joinWatchdogTimer);
+          joinWatchdogTimer = null;
+        }
+        leaveOnlineRoom();
+        elOverOnline.classList.remove('hidden');
+        elViewOnlineMenu.classList.remove('hidden');
+        elViewOnlineLobby.classList.add('hidden');
+        elOverStart.classList.add('hidden');
+        showOnlineError('Phòng đã đầy người (4/4), bạn không thể vô!');
+        showToast('⚠️ Phòng đã đầy người (4/4), bạn không thể vô!');
+      }
+      break;
+    }
+
     case 'ROOM_UPDATE': {
+      if (joinWatchdogTimer) {
+        clearTimeout(joinWatchdogTimer);
+        joinWatchdogTimer = null;
+      }
       roomPlayers = msg.players || [];
       const me = roomPlayers.find(p => p.id === myPlayerId);
       if (me) mySlot = me.slot;
