@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;800;900&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=2.5.3">
+  <link rel="stylesheet" href="style.css?v=2.6.0">
   <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 </head>
 <body>
@@ -136,7 +136,7 @@
           </span>
           <span class="slot-count" id="countMine">x1</span>
         </button>
-        <button class="inv-slot gun-slot" id="slotGun" onclick="shootGun()" title="Nhấn phím 3, F hoặc click để bắn">
+        <button class="inv-slot gun-slot" id="slotGun" onclick="shootGun()" title="Nhấn phím 3, F, Space hoặc click để bắn">
           <span class="slot-key">3</span>
           <span class="slot-icon">
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#ff9100" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -144,7 +144,7 @@
               <circle cx="18" cy="10" r="1" fill="#fff"/>
             </svg>
           </span>
-          <span class="slot-count" id="countGun">x0</span>
+          <span class="slot-count" id="countGun">x3</span>
         </button>
       </div>
     </div>
@@ -152,6 +152,11 @@
     <!-- Event Toast Alert -->
     <div class="event-toast hidden" id="eventToast">
       <span class="toast-text" id="toastText"></span>
+    </div>
+
+    <!-- Combat / Damage Floating Alert -->
+    <div class="combat-alert hidden" id="combatAlert">
+      <span class="combat-alert-text" id="combatAlertText"></span>
     </div>
 
     <!-- Hazard warning banner -->
@@ -277,7 +282,7 @@
               <div class="join-divider"><span>HOẶC NHẬP MÃ PHÒNG</span></div>
 
               <div class="join-row">
-                <input type="text" id="inputRoomCode" class="form-input code-input" maxlength="6" placeholder="MÃ PHÒNG..." uppercase>
+                <input type="text" id="inputRoomCode" class="form-input code-input" maxlength="4" placeholder="MÃ PHÒNG (4 ký tự)..." oninput="handleRoomCodeInput(this)">
                 <button class="btn-online join glow-btn" onclick="joinOnlineRoom()">
                   <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="8" cy="12" r="4"/><path d="M12 12h8v3h-3v2h-2"/></svg>
                   <span>Vào phòng</span>
@@ -476,7 +481,7 @@
         <!-- Bắn Main Circle Button -->
         <button class="circle-btn shoot-btn" id="mobileBtnShoot" onclick="shootGun()" title="Bắn súng">
           <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#ff9100" stroke-width="2.2"><path d="M3 11h11l3-3h3v5h-2l-1 2h-4v4h-3v-4H3z" fill="rgba(255,145,0,0.3)"/><circle cx="18" cy="10" r="1.5" fill="#fff"/></svg>
-          <span class="circle-badge orange-badge" id="mobileCountGun">x0</span>
+          <span class="circle-badge orange-badge" id="mobileCountGun">x3</span>
           <span class="btn-subtext main-label">BẮN</span>
         </button>
       </div>
@@ -484,11 +489,11 @@
 
     <!-- Footer -->
     <footer class="game-footer">
-      <span><kbd>WASD</kbd>/<kbd>Mũi tên</kbd> di chuyển · <kbd>3</kbd>/<kbd>F</kbd>/Click Bắn · <kbd>Space</kbd> Tạm dừng · <kbd>ESC</kbd> Thoát game</span>
+      <span><kbd>WASD</kbd> di chuyển (nhả ra dừng) · <kbd>Space</kbd>/<kbd>F</kbd>/<kbd>3</kbd>/Click Bắn · <kbd>P</kbd> Tạm dừng · <kbd>ESC</kbd> Thoát game</span>
       <span class="pause-indicator hidden" id="pauseIndicator">ĐÃ TẠM DỪNG</span>
     </footer>
   </div>
 
-  <script src="game.js?v=2.5.3"></script>
+  <script src="game.js?v=2.6.0"></script>
 </body>
 </html>

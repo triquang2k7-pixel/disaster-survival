@@ -279,12 +279,48 @@ let trapFrozenTimer = 0;
 // Inventory System (Key 1: Trap, Key 2: Landmine, Key 3: Gun)
 let trapCount = 1;
 let mineCount = 1;
-let gunAmmo = 0;   // Gun bullets count
+let gunAmmo = 3;   // Gun bullets count (3 starting bullets)
 let items = [];
 let itemTimer = 3000;
 let placedTraps = [];
 let placedMines = [];
 let bullets = []; // Active flying bullets { x, y, vx, vy, ownerSlot, distTraveled }
+let sinkholeCycleTimer = 0;
+let combatAlertTimer = null;
+
+// Combat & Hazard UI Notification Banner
+function showCombatAlert(msg, type = 'normal') {
+  const el = document.getElementById('combatAlert');
+  const txt = document.getElementById('combatAlertText');
+  if (!el || !txt) return;
+
+  txt.textContent = msg;
+  el.className = `combat-alert ${type}`;
+  el.classList.remove('hidden');
+
+  if (combatAlertTimer) clearTimeout(combatAlertTimer);
+  combatAlertTimer = setTimeout(() => {
+    el.classList.add('hidden');
+  }, 2600);
+}
+window.showCombatAlert = showCombatAlert;
+
+// 4-Character Room Code Validation
+window.handleRoomCodeInput = function(input) {
+  if (!input) return;
+  const raw = input.value;
+  const clean = raw.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (raw.length > 4 || clean.length > 4) {
+    showToast('⚠️ Mã phòng tối đa 4 ký tự!');
+    if (elOnlineError) {
+      elOnlineError.textContent = 'Mã phòng tối đa 4 ký tự!';
+      elOnlineError.classList.remove('hidden');
+    }
+  } else if (elOnlineError) {
+    elOnlineError.classList.add('hidden');
+  }
+  input.value = clean.slice(0, 4);
+};
 
 // Coins earned this round
 let roundCoins = 0;
@@ -587,7 +623,8 @@ function startGame() {
     trapCount = 1;
     mineCount = 1;
   }
-  gunAmmo = 0;
+  gunAmmo = 3;
+  sinkholeCycleTimer = 0;
 
   items = [];
   itemTimer = 3500;
@@ -979,19 +1016,40 @@ function updateBullets(dt) {
         break;
       }
 
+      // Check hit on hazard bombs (detonate bomb with bullets)
+      for (let bi = bombs.length - 1; bi >= 0; bi--) {
+        const bm = bombs[bi];
+        if (bm && (bm.state === 'falling' || bm.state === 'fuse')) {
+          const bmPx = bm.gx * CELL + CELL / 2;
+          const bmPy = bm.gy * CELL + CELL / 2;
+          if (Math.hypot(b.x - bmPx, b.y - bmPy) < CELL * 1.1) {
+            explodeBomb(bm);
+            bombs.splice(bi, 1);
+            spawnFloatingText('BẮN NỔ BOM!', bm.gx, bm.gy, '#ff9100');
+            bullets.splice(i, 1);
+            break;
+          }
+        }
+      }
+      if (i >= bullets.length || !bullets[i]) break;
+
       // Check hit on other players (multiplayer only)
       if (isMultiplayer) {
         for (const rp of roomPlayers) {
           if (rp.slot === b.ownerSlot || !rp.isAlive) continue;
 
-          if (rp.x === bulletGx && rp.y === bulletGy) {
+          const pPx = (rp.slot === mySlot ? player.x : (rp.x !== undefined ? rp.x : rp.gx)) * CELL + CELL / 2;
+          const pPy = (rp.slot === mySlot ? player.y : (rp.y !== undefined ? rp.y : rp.gy)) * CELL + CELL / 2;
+          const hitDist = Math.hypot(b.x - pPx, b.y - pPy);
+
+          if (hitDist < CELL * 0.95) {
             spawnExplosionParticles(bulletGx, bulletGy);
             spawnFloatingText('TRÚNG ĐÍCH!', bulletGx, bulletGy, '#ff1744');
             bullets.splice(i, 1);
 
             // Only the bullet shooter's client sends the hit event to avoid duplicate damage
             if (b.ownerSlot === mySlot) {
-              showToast(`Bạn bắn trúng ${rp.name}! (-${GUN_BULLET_DAMAGE} HP)`);
+              showCombatAlert(`🔫 Bạn bắn trúng ${rp.name}! (-${GUN_BULLET_DAMAGE} HP)`, 'danger');
               broadcastNetworkMessage({
                 type: 'BULLET_HIT',
                 victimSlot: rp.slot,
@@ -1118,9 +1176,9 @@ function checkTrapsAndMinesTrigger() {
     if (!isOwner && t.armTimer > 1400) continue;
 
     if (Math.hypot(player.x - t.x, player.y - t.y) < 0.65) {
-      trapFrozenTimer = 3000;
+      trapFrozenTimer = 2500;
       takeDamage(15, 'Bị dính bẫy sắt và tử nạn!');
-      showToast('BẠN BỊ DÍNH BẪY! Bất động 3 giây!');
+      showCombatAlert('⛓️ Bạn bị dính Bẫy kẹp! Bất động 2.5s (-15 HP)', 'warning');
       spawnFloatingText('BỊ KẸP CHÂN', player.x, player.y, '#ffea00');
       placedTraps.splice(i, 1);
 
@@ -1129,6 +1187,7 @@ function checkTrapsAndMinesTrigger() {
           type: 'TRAP_TRIGGERED',
           trapId: t.id,
           victimSlot: mySlot,
+          victimName: myPlayerName,
         });
       }
       break;
@@ -1144,6 +1203,7 @@ function checkTrapsAndMinesTrigger() {
 
     if (Math.hypot(player.x - m.x, player.y - m.y) < 0.65) {
       explodeLandmine(m);
+      showCombatAlert('💥 Bạn vừa dẫm phải Mìn Nổ! (-50 HP)', 'danger');
       placedMines.splice(i, 1);
 
       if (isMultiplayer) {
@@ -1152,6 +1212,7 @@ function checkTrapsAndMinesTrigger() {
           mineId: m.id,
           x: m.x,
           y: m.y,
+          victimName: myPlayerName,
         });
       }
       break;
@@ -1611,40 +1672,13 @@ function spawnFireSparks(gx, gy) {
 // ══════════════════════════════════════════════
 
 function startThunderstorm() {
-  const zones = [];
-  const numZones = 1 + (Math.random() < 0.5 ? 1 : 0);
-
-  for (let z = 0; z < numZones; z++) {
-    let cx, cy, tries = 0;
-    do {
-      cx = 2 + Math.floor(Math.random() * (GRID - 4));
-      cy = 2 + Math.floor(Math.random() * (GRID - 4));
-      tries++;
-    } while (tries < 50 && (Math.abs(cx - player.x) < 3 && Math.abs(cy - player.y) < 3));
-
-    const cells = [];
-    const radius = 1 + (Math.random() < 0.5 ? 1 : 0);
-    for (let dx = -radius; dx <= radius; dx++) {
-      for (let dy = -radius; dy <= radius; dy++) {
-        if (Math.abs(dx) + Math.abs(dy) <= radius + 1) {
-          const gx = cx + dx;
-          const gy = cy + dy;
-          if (gx >= 0 && gx < GRID && gy >= 0 && gy < GRID) {
-            cells.push({ x: gx, y: gy });
-          }
-        }
-      }
-    }
-    zones.push({ cx, cy, cells });
-  }
-
   raindrops = [];
-  for (let i = 0; i < 55; i++) {
+  for (let i = 0; i < 65; i++) {
     raindrops.push({
       x: Math.random() * CANVAS_PX,
       y: Math.random() * CANVAS_PX,
-      l: 10 + Math.random() * 12,
-      speed: 13 + Math.random() * 8,
+      l: 12 + Math.random() * 14,
+      speed: 14 + Math.random() * 8,
     });
   }
 
@@ -1657,11 +1691,15 @@ function startThunderstorm() {
   }
 
   thunderstorm = {
-    state: 'warning',
-    stateTime: 0,
-    targetZones: zones,
+    duration: 18000, // 18 seconds rain storm
+    nextStrikeTimer: 800 + Math.random() * 1200, // First strike in ~1-2s
+    burstQueue: 0,
+    burstInterval: 0,
+    strikes: [], // active lightning strikes
     flashAlpha: 0,
   };
+
+  showHazardWarning('⚡ MƯA BÃO SẤM CHỚP: Sét đánh liên tục cách 1-3s, trúng mất 50-70 HP!', 3500);
 }
 
 function spreadWaterPuddles() {
@@ -1720,8 +1758,9 @@ function updateThunderstorm(dt) {
     return;
   }
 
-  thunderstorm.stateTime += dt;
+  thunderstorm.duration -= dt;
 
+  // Raindrops
   for (const r of raindrops) {
     r.y += r.speed;
     r.x -= 2;
@@ -1737,53 +1776,107 @@ function updateThunderstorm(dt) {
     spreadWaterPuddles();
   }
 
-  if (thunderstorm.state === 'warning') {
-    if (thunderstorm.stateTime >= THUNDER_WARN_TIME) {
-      thunderstorm.state = 'striking';
-      thunderstorm.stateTime = 0;
+  // Update ongoing lightning strikes
+  for (let i = thunderstorm.strikes.length - 1; i >= 0; i--) {
+    const s = thunderstorm.strikes[i];
+    s.timer -= dt;
+
+    if (s.state === 'warning' && s.timer <= 0) {
+      // Strike hits NOW!
+      s.state = 'striking';
+      s.timer = 180;
       thunderstorm.flashAlpha = 0.85;
+      triggerScreenShake(2.8, 180);
 
-      triggerScreenShake(2.5, 200);
-
-      electrifiedPuddles = new Set();
-      let hitWater = false;
-
-      for (const z of thunderstorm.targetZones) {
-        spawnElectricSparks(z.cx, z.cy);
-        for (const c of z.cells) {
-          if (puddleCells.has(`${c.x},${c.y}`)) hitWater = true;
+      // Populate lightningCells for electricity
+      for (const c of s.cells) {
+        lightningCells.add(`${c.x},${c.y}`);
+        if (puddleCells.has(`${c.x},${c.y}`)) {
+          electrifiedPuddles.add(`${c.x},${c.y}`);
         }
       }
+      spawnElectricSparks(s.cx, s.cy);
 
-      if (hitWater || puddleCells.size > 0) {
-        for (const p of puddleCells) electrifiedPuddles.add(p);
+      // Check damage: "nếu người chơi di chuyển vào vùng sấm chớp lúc nó đánh xuống sẽ bị mất 50-70 hp"
+      let hitPlayer = false;
+      for (const c of s.cells) {
+        if (Math.hypot(player.x - c.x, player.y - c.y) < 1.15) {
+          hitPlayer = true;
+          break;
+        }
       }
+      if (hitPlayer) {
+        const dmg = Math.floor(50 + Math.random() * 21); // 50 to 70 HP
+        takeDamage(dmg, 'Bị sấm sét đánh trúng lúc giáng xuống!');
+        spawnFloatingText(`-${dmg} HP SẤM SÉT!`, player.x, player.y, '#00e5ff');
+        showCombatAlert(`⚡ Bị sấm sét giáng trúng mất ${dmg} HP!`, 'danger');
+        triggerScreenShake(3.5, 240);
+      }
+    } else if (s.state === 'striking' && s.timer <= 0) {
+      s.state = 'dissipating';
+      s.timer = 350;
+    } else if (s.state === 'dissipating' && s.timer <= 0) {
+      for (const c of s.cells) {
+        lightningCells.delete(`${c.x},${c.y}`);
+      }
+      thunderstorm.strikes.splice(i, 1);
     }
-    return;
   }
 
-  if (thunderstorm.state === 'striking') {
-    thunderstorm.flashAlpha = Math.max(0, thunderstorm.flashAlpha - dt * 0.003);
-
-    if (thunderstorm.stateTime >= THUNDER_STRIKE_TIME) {
-      thunderstorm.state = 'electrified';
-      thunderstorm.stateTime = 0;
-      lightningCells = new Set();
-      for (const z of thunderstorm.targetZones) {
-        for (const c of z.cells) lightningCells.add(`${c.x},${c.y}`);
-      }
-    }
-    return;
+  if (thunderstorm.flashAlpha > 0) {
+    thunderstorm.flashAlpha = Math.max(0, thunderstorm.flashAlpha - dt * 0.004);
   }
 
-  if (thunderstorm.state === 'electrified') {
-    if (thunderstorm.stateTime >= THUNDER_SHOCK_TIME) {
-      lightningCells = new Set();
-      electrifiedPuddles = new Set();
-      puddleCells = new Set();
-      thunderstorm = null;
-      raindrops = [];
+  // Periodic Strike Triggering: "trời mưa sẽ sấm chớp liên tục cách 1-3 giây random có lúc 1 lần có lúc chớp 4-5 lần."
+  if (thunderstorm.duration > 0) {
+    if (thunderstorm.burstQueue <= 0) {
+      thunderstorm.nextStrikeTimer -= dt;
+      if (thunderstorm.nextStrikeTimer <= 0) {
+        // Random 50% chớp 1 lần, 50% chớp 4-5 lần liên tiếp!
+        const isBurst = Math.random() < 0.5;
+        thunderstorm.burstQueue = isBurst ? (4 + Math.floor(Math.random() * 2)) : 1;
+        thunderstorm.burstInterval = 0;
+        thunderstorm.nextStrikeTimer = 1000 + Math.random() * 2000; // 1-3 giây giữa các lần chớp!
+      }
     }
+
+    if (thunderstorm.burstQueue > 0) {
+      thunderstorm.burstInterval -= dt;
+      if (thunderstorm.burstInterval <= 0) {
+        thunderstorm.burstQueue--;
+        thunderstorm.burstInterval = 250 + Math.random() * 80; // 250-330ms giữa các cú sét trong chùm!
+
+        // Spawn a new strike
+        const cx = 2 + Math.floor(Math.random() * (GRID - 4));
+        const cy = 2 + Math.floor(Math.random() * (GRID - 4));
+        const cells = [];
+        const radius = 1;
+        for (let dx = -radius; dx <= radius; dx++) {
+          for (let dy = -radius; dy <= radius; dy++) {
+            if (Math.abs(dx) + Math.abs(dy) <= radius + 1) {
+              const gx = cx + dx;
+              const gy = cy + dy;
+              if (gx >= 0 && gx < GRID && gy >= 0 && gy < GRID) {
+                cells.push({ x: gx, y: gy });
+              }
+            }
+          }
+        }
+        thunderstorm.strikes.push({
+          cx, cy, cells,
+          state: 'warning',
+          timer: 350, // 350ms warning before lightning strikes
+        });
+      }
+    }
+  } else if (thunderstorm.strikes.length === 0) {
+    // Storm ended
+    lightningCells = new Set();
+    electrifiedPuddles = new Set();
+    puddleCells = new Set();
+    thunderstorm = null;
+    raindrops = [];
+    thunderTimer = THUNDER_INTERVAL_MIN + Math.random() * (THUNDER_INTERVAL_MAX - THUNDER_INTERVAL_MIN);
   }
 }
 
@@ -2396,10 +2489,14 @@ function updateMovement(dt) {
     dir.y = inputY / len;
     nextDir.x = dir.x;
     nextDir.y = dir.y;
-  } else if (nextDir && (nextDir.x !== 0 || nextDir.y !== 0)) {
-    // If no keys held, keep running in last selected direction (swipe, mobile D-pad, auto-runner)
-    dir.x = nextDir.x;
-    dir.y = nextDir.y;
+  } else if (joystickActive && (dir.x !== 0 || dir.y !== 0)) {
+    // Joystick is currently held active by mobile user
+  } else {
+    // "nhân vật chỉ di chuyển khi điều khiển nút di chuyển" - Nhả phím hoặc buông cần là dừng ngay!
+    dir.x = 0;
+    dir.y = 0;
+    nextDir.x = 0;
+    nextDir.y = 0;
   }
 
   if (dir.x === 0 && dir.y === 0) return;
@@ -2411,7 +2508,31 @@ function updateMovement(dt) {
   // Apply tornado slow penalty if caught in vortex
   if (tornadoSlowTimer > 0) tornadoSlowTimer -= dt;
   const speedMult = tornadoSlowTimer > 0 ? 0.48 : 1.0;
-  const dist = cellSpeed * speedMult * (dt / 1000);
+
+  // Sụt lún: "nếu rơi vào thiên tai sụt lún thì sẽ có lúc đi chậm có lúc đứng yên"
+  const curCellKey = `${Math.floor(player.x)},${Math.floor(player.y)}`;
+  let sinkholeSpeedMult = 1.0;
+  if (sinkholeCells.has(curCellKey)) {
+    sinkholeCycleTimer += dt;
+    const cycle = sinkholeCycleTimer % 2400;
+    if (cycle < 1500) {
+      // Có lúc đi chậm: tốc độ giảm còn 30%
+      sinkholeSpeedMult = 0.3;
+      if (Math.random() < 0.04) {
+        spawnFloatingText('LÚN ĐẤT (Đi chậm)', player.x, player.y, '#d7ccc8');
+      }
+    } else {
+      // Có lúc đứng yên: tốc độ 0% (chôn chân hoàn toàn)
+      sinkholeSpeedMult = 0.0;
+      if (Math.random() < 0.05) {
+        spawnFloatingText('SỤT LÚN (ĐỨNG YÊN)!', player.x, player.y, '#bcaaa4');
+      }
+    }
+  } else {
+    sinkholeCycleTimer = 0;
+  }
+
+  const dist = cellSpeed * speedMult * sinkholeSpeedMult * (dt / 1000);
 
   // Update floating-point position
   player.x += dir.x * dist;
@@ -3623,7 +3744,8 @@ function drawThunderstorm() {
   ctx.fillStyle = 'rgba(5, 15, 25, 0.35)';
   ctx.fillRect(0, 0, CANVAS_PX, CANVAS_PX);
 
-  ctx.strokeStyle = 'rgba(128, 216, 255, 0.6)';
+  // Raindrops
+  ctx.strokeStyle = 'rgba(128, 216, 255, 0.65)';
   ctx.lineWidth = 1.4;
   for (const r of raindrops) {
     ctx.beginPath();
@@ -3632,94 +3754,69 @@ function drawThunderstorm() {
     ctx.stroke();
   }
 
-  if (thunderstorm.state === 'warning') {
-    const pulse = 0.4 + Math.sin(now * 0.012) * 0.35;
-    const remainingSec = Math.max(0, (THUNDER_WARN_TIME - thunderstorm.stateTime) / 1000).toFixed(1);
+  // Draw each lightning strike
+  if (thunderstorm.strikes && thunderstorm.strikes.length > 0) {
+    for (const s of thunderstorm.strikes) {
+      if (s.state === 'warning') {
+        const pulse = 0.5 + Math.sin(now * 0.02) * 0.5;
+        for (const cell of s.cells) {
+          const x = cell.x * CELL;
+          const y = cell.y * CELL;
+          ctx.fillStyle = `rgba(0, 229, 255, ${0.25 * pulse})`;
+          ctx.fillRect(x, y, CELL, CELL);
 
-    for (const z of thunderstorm.targetZones) {
-      for (const cell of z.cells) {
-        const x = cell.x * CELL;
-        const y = cell.y * CELL;
+          ctx.strokeStyle = `rgba(255, 234, 0, ${0.75 * pulse})`;
+          ctx.lineWidth = 1.6;
+          ctx.setLineDash([3, 3]);
+          ctx.strokeRect(x + 1, y + 1, CELL - 2, CELL - 2);
+          ctx.setLineDash([]);
+        }
 
-        ctx.fillStyle = `rgba(0, 176, 255, ${0.2 * pulse})`;
-        ctx.fillRect(x, y, CELL, CELL);
+        const zx = s.cx * CELL + CELL / 2;
+        const zy = s.cy * CELL + CELL / 2;
 
-        ctx.strokeStyle = `rgba(255, 234, 0, ${0.55 * pulse})`;
-        ctx.lineWidth = 1.5;
-        ctx.setLineDash([3, 3]);
-        ctx.strokeRect(x + 1, y + 1, CELL - 2, CELL - 2);
-        ctx.setLineDash([]);
+        ctx.save();
+        ctx.shadowColor = 'rgba(0, 229, 255, 0.95)';
+        ctx.shadowBlur = 14;
+        ctx.fillStyle = '#ffea00';
+        ctx.font = '800 11px "JetBrains Mono", monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('⚡ SÉT ĐÁNH!', zx, zy - 10);
+        ctx.restore();
+      } else if (s.state === 'striking' || s.state === 'dissipating') {
+        const targetX = s.cx * CELL + CELL / 2;
+        const targetY = s.cy * CELL + CELL / 2;
+
+        ctx.save();
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = s.state === 'striking' ? 3.8 : 2.2;
+        ctx.shadowColor = '#40c4ff';
+        ctx.shadowBlur = 24;
+
+        ctx.beginPath();
+        ctx.moveTo(targetX + (Math.random() - 0.5) * 30, 0);
+
+        let curX = targetX;
+        const segments = 6;
+        for (let seg = 1; seg <= segments; seg++) {
+          const nextY = (targetY / segments) * seg;
+          const nextX = seg === segments ? targetX : curX + (Math.random() - 0.5) * 35;
+          ctx.lineTo(nextX, nextY);
+          curX = nextX;
+        }
+        ctx.stroke();
+
+        ctx.strokeStyle = '#00e5ff';
+        ctx.lineWidth = 2.0;
+        ctx.stroke();
+        ctx.restore();
       }
-
-      const zx = z.cx * CELL + CELL / 2;
-      const zy = z.cy * CELL + CELL / 2;
-
-      ctx.save();
-      ctx.shadowColor = 'rgba(0, 229, 255, 0.95)';
-      ctx.shadowBlur = 16;
-      ctx.fillStyle = '#00e5ff';
-      ctx.beginPath();
-      ctx.moveTo(zx + 2, zy - 10);
-      ctx.lineTo(zx - 6, zy + 1);
-      ctx.lineTo(zx - 1, zy + 1);
-      ctx.lineTo(zx - 3, zy + 11);
-      ctx.lineTo(zx + 7, zy - 1);
-      ctx.lineTo(zx + 1, zy - 1);
-      ctx.closePath();
-      ctx.fill();
-
-      ctx.fillStyle = '#ffffff';
-      ctx.beginPath();
-      ctx.moveTo(zx + 1, zy - 7);
-      ctx.lineTo(zx - 3, zy);
-      ctx.lineTo(zx, zy);
-      ctx.lineTo(zx - 1, zy + 7);
-      ctx.lineTo(zx + 4, zy);
-      ctx.lineTo(zx + 1, zy);
-      ctx.closePath();
-      ctx.fill();
-
-      ctx.font = '800 11px "JetBrains Mono", monospace';
-      ctx.fillStyle = '#ffea00';
-      ctx.fillText(remainingSec + 's', zx, zy - 14);
-      ctx.restore();
     }
   }
 
-  if (thunderstorm.state === 'striking') {
-    if (thunderstorm.flashAlpha > 0) {
-      ctx.fillStyle = `rgba(224, 247, 250, ${thunderstorm.flashAlpha})`;
-      ctx.fillRect(0, 0, CANVAS_PX, CANVAS_PX);
-    }
-
-    ctx.save();
-    ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 3.5;
-    ctx.shadowColor = '#40c4ff';
-    ctx.shadowBlur = 22;
-
-    for (const z of thunderstorm.targetZones) {
-      const targetX = z.cx * CELL + CELL / 2;
-      const targetY = z.cy * CELL + CELL / 2;
-
-      ctx.beginPath();
-      ctx.moveTo(targetX + (Math.random() - 0.5) * 40, 0);
-
-      let curX = targetX;
-      const segments = 6;
-      for (let s = 1; s <= segments; s++) {
-        const nextY = (targetY / segments) * s;
-        const nextX = s === segments ? targetX : curX + (Math.random() - 0.5) * 35;
-        ctx.lineTo(nextX, nextY);
-        curX = nextX;
-      }
-      ctx.stroke();
-
-      ctx.strokeStyle = '#40c4ff';
-      ctx.lineWidth = 1.8;
-      ctx.stroke();
-    }
-    ctx.restore();
+  if (thunderstorm.flashAlpha > 0) {
+    ctx.fillStyle = `rgba(224, 247, 250, ${thunderstorm.flashAlpha * 0.7})`;
+    ctx.fillRect(0, 0, CANVAS_PX, CANVAS_PX);
   }
 }
 
@@ -3995,14 +4092,15 @@ document.addEventListener('keydown', e => {
     return;
   }
 
-  // Key 3, F, or J: Shoot Gun
-  if (e.key === '3' || e.code === 'Digit3' || e.key === 'f' || e.key === 'F' || e.key === 'j' || e.key === 'J') {
+  // Key 3, F, J, or Space: Shoot Gun
+  if (e.key === '3' || e.code === 'Digit3' || e.key === 'f' || e.key === 'F' || e.key === 'j' || e.key === 'J' || e.key === ' ' || e.code === 'Space') {
     e.preventDefault();
     if (running && !paused) shootGun();
     return;
   }
 
-  if (e.key === ' ' || e.key === 'Spacebar') {
+  // Key P: Pause / Resume Game
+  if (e.key === 'p' || e.key === 'P') {
     e.preventDefault();
     togglePause();
     return;
@@ -4058,15 +4156,25 @@ window.addEventListener('blur', () => {
   keysDown.clear();
 });
 
-// Canvas click to aim & shoot directly with mouse
-canvas.addEventListener('click', e => {
+// Canvas pointerdown & click to aim & shoot directly with mouse
+function handleCanvasAimShoot(clientX, clientY) {
   if (!running || paused || isSpectator) return;
   const rect = canvas.getBoundingClientRect();
   const scaleX = canvas.width / rect.width;
   const scaleY = canvas.height / rect.height;
-  const clickX = (e.clientX - rect.left) * scaleX;
-  const clickY = (e.clientY - rect.top) * scaleY;
+  const clickX = (clientX - rect.left) * scaleX;
+  const clickY = (clientY - rect.top) * scaleY;
   shootGun(clickX, clickY);
+}
+
+canvas.addEventListener('pointerdown', e => {
+  if (e.pointerType === 'mouse' && e.button === 0) {
+    handleCanvasAimShoot(e.clientX, e.clientY);
+  }
+});
+
+canvas.addEventListener('click', e => {
+  handleCanvasAimShoot(e.clientX, e.clientY);
 });
 
 function togglePause() {
@@ -4235,6 +4343,32 @@ function initVirtualJoystick() {
   window.addEventListener('mouseup', e => {
     if (joystickActive && joystickTouchId === 'mouse') handleTouchEnd(e);
   });
+
+  // Multi-touch listeners for Mobile Action Buttons: Bắn, Bẫy, Mìn
+  const mShoot = document.getElementById('mobileBtnShoot');
+  if (mShoot) {
+    mShoot.addEventListener('touchstart', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      shootGun();
+    }, { passive: false });
+  }
+  const mTrap = document.getElementById('mobileBtnTrap');
+  if (mTrap) {
+    mTrap.addEventListener('touchstart', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      deployTrap();
+    }, { passive: false });
+  }
+  const mMine = document.getElementById('mobileBtnMine');
+  if (mMine) {
+    mMine.addEventListener('touchstart', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      deployMine();
+    }, { passive: false });
+  }
 }
 initVirtualJoystick();
 
@@ -4347,14 +4481,18 @@ function joinOnlineRoom() {
   const nameInput = elOnlinePlayerName.value.trim();
   const codeInput = elInputRoomCode.value.trim().toUpperCase();
 
-  if (!codeInput || codeInput.length < 3) {
-    showOnlineError('Vui lòng nhập mã phòng hợp lệ!');
+  if (!codeInput || codeInput.length !== 4) {
+    showOnlineError('Mã phòng phải gồm đúng 4 ký tự!');
     return;
   }
 
-  // Check known rooms for room capacity
+  // Check known rooms for existence and room capacity
   const activeRooms = getActiveRooms();
-  if (activeRooms[codeInput] && activeRooms[codeInput].playerCount >= 4) {
+  if (!activeRooms[codeInput]) {
+    showOnlineError('Mã phòng không tồn tại hoặc chủ phòng đã thoát!');
+    return;
+  }
+  if (activeRooms[codeInput].playerCount >= 4) {
     showOnlineError('Phòng đã đầy người (4/4), bạn không thể vô!');
     return;
   }
@@ -4399,9 +4537,9 @@ function joinOnlineRoom() {
       elViewOnlineMenu.classList.remove('hidden');
       elViewOnlineLobby.classList.add('hidden');
       elOverStart.classList.add('hidden');
-      showOnlineError('Mã phòng không tồn tại hoặc chủ phòng đã đóng!');
+      showOnlineError('Mã phòng không tồn tại hoặc chủ phòng đã thoát!');
     }
-  }, 4500);
+  }, 4000);
 }
 
 function showOnlineError(msg) {
@@ -4884,13 +5022,17 @@ function handleNetworkMessage(msg) {
     case 'TRAP_TRIGGERED': {
       placedTraps = placedTraps.filter(t => t.id !== msg.trapId);
       const victim = roomPlayers.find(p => p.slot === msg.victimSlot);
-      if (victim) { victim.isFrozen = true; setTimeout(() => { victim.isFrozen = false; }, 3000); }
+      if (victim) { victim.isFrozen = true; setTimeout(() => { victim.isFrozen = false; }, 2500); }
+      const vName = msg.victimName || victim?.name || 'Người chơi';
+      showCombatAlert(`⛓️ ${vName} bị dính Bẫy kẹp! Bất động 2.5s`, 'warning');
       break;
     }
 
     case 'MINE_EXPLODED': {
       placedMines = placedMines.filter(m => m.id !== msg.mineId);
       explodeLandmine({ x: msg.x, y: msg.y });
+      const vName = msg.victimName || 'Một người chơi';
+      showCombatAlert(`💥 ${vName} vừa dẫm phải Mìn Nổ! (-50 HP)`, 'danger');
       break;
     }
 
@@ -4905,9 +5047,13 @@ function handleNetworkMessage(msg) {
     }
 
     case 'BULLET_HIT': {
+      const victim = roomPlayers.find(p => p.slot === msg.victimSlot);
+      const shooter = roomPlayers.find(p => p.slot === msg.shooterSlot);
+      const vName = victim?.name || 'Chiến binh';
+      const sName = shooter?.name || 'Chiến binh';
+      showCombatAlert(`🔫 ${sName} bắn trúng ${vName} (-${msg.damage} HP)!`, 'danger');
       if (msg.victimSlot === mySlot) {
-        const shooter = roomPlayers.find(p => p.slot === msg.shooterSlot);
-        takeDamage(msg.damage, `Bị bắn hạ bởi ${shooter?.name || 'ai đó'}!`);
+        takeDamage(msg.damage, `Bị bắn hạ bởi ${sName}!`);
       }
       break;
     }
