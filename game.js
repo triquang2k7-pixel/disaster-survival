@@ -189,9 +189,19 @@ function triggerScreenShake(intensity = 3, duration = 200) {
   camShakeTimer = Math.max(camShakeTimer, duration);
 }
 
-// Light Atmospheric Fog System
+// Dynamic Atmospheric Fog Weather System ("sương mù lâu lâu mới xuất hiện")
 const FOG_COUNT = 14;
+const FOG_CLEAR_TIME_MIN = 22000; // ~22s trời quang đãng không sương mù
+const FOG_CLEAR_TIME_MAX = 35000; // ~35s trời quang đãng
+const FOG_FADE_IN_TIME   = 3500;  // 3.5s sương mù từ từ tràn vào
+const FOG_ACTIVE_TIME    = 13000; // 13s sương mù bao phủ mờ nhẹ
+const FOG_FADE_OUT_TIME  = 3500;  // 3.5s sương mù tan dần
 let fogPuffs = [];
+let fogWeather = {
+  state: 'inactive', // 'inactive', 'entering', 'active', 'leaving'
+  timer: 20000 + Math.random() * 10000,
+  currentAlpha: 0,
+};
 
 function initFog() {
   fogPuffs = [];
@@ -206,6 +216,43 @@ function initFog() {
       phase: Math.random() * Math.PI * 2,
       pulseSpeed: 0.001 + Math.random() * 0.0015,
     });
+  }
+}
+
+function updateFogWeather(dt) {
+  if (isMultiplayer && !isHost) return;
+
+  fogWeather.timer -= dt;
+
+  if (fogWeather.state === 'inactive') {
+    fogWeather.currentAlpha = 0;
+    if (fogWeather.timer <= 0) {
+      fogWeather.state = 'entering';
+      fogWeather.timer = FOG_FADE_IN_TIME;
+      if (Math.random() < 0.6) showToast('SƯƠNG MÙ: Màn sương mờ ảo bắt đầu bao phủ...');
+    }
+  } else if (fogWeather.state === 'entering') {
+    const progress = Math.max(0, Math.min(1, 1 - (fogWeather.timer / FOG_FADE_IN_TIME)));
+    fogWeather.currentAlpha = progress;
+    if (fogWeather.timer <= 0) {
+      fogWeather.state = 'active';
+      fogWeather.timer = FOG_ACTIVE_TIME + Math.random() * 4000;
+      fogWeather.currentAlpha = 1.0;
+    }
+  } else if (fogWeather.state === 'active') {
+    fogWeather.currentAlpha = 1.0;
+    if (fogWeather.timer <= 0) {
+      fogWeather.state = 'leaving';
+      fogWeather.timer = FOG_FADE_OUT_TIME;
+    }
+  } else if (fogWeather.state === 'leaving') {
+    const progress = Math.max(0, Math.min(1, fogWeather.timer / FOG_FADE_OUT_TIME));
+    fogWeather.currentAlpha = progress;
+    if (fogWeather.timer <= 0) {
+      fogWeather.state = 'inactive';
+      fogWeather.timer = FOG_CLEAR_TIME_MIN + Math.random() * (FOG_CLEAR_TIME_MAX - FOG_CLEAR_TIME_MIN);
+      fogWeather.currentAlpha = 0;
+    }
   }
 }
 
@@ -585,6 +632,9 @@ function startGame() {
   shockwaves      = [];
   bombTimer       = 5500;
   tornadoSlowTimer = 0;
+
+  // Sương mù bắt đầu ở trạng thái quang đãng 20-30s ("lâu lâu mới xuất hiện")
+  fogWeather      = { state: 'inactive', timer: 20000 + Math.random() * 10000, currentAlpha: 0 };
 
   hideWarning();
 
@@ -2306,6 +2356,7 @@ function loop(now) {
   updateTornado(dt);
   updateLandslide(dt);
   updateBombs(dt);
+  updateFogWeather(dt);
 
   updateWarningBanners();
 
@@ -2652,8 +2703,10 @@ function draw() {
 }
 
 function drawAtmosphericFog() {
+  if (fogWeather.currentAlpha <= 0.005) return; // Trời quang đãng: không tốn chi phí render sương mù
   if (fogPuffs.length === 0) initFog();
 
+  const fogMult = fogWeather.currentAlpha;
   const px = (player && typeof player.x === 'number') ? (player.x * CELL + CELL / 2) : (CANVAS_PX / 2);
   const py = (player && typeof player.y === 'number') ? (player.y * CELL + CELL / 2) : (CANVAS_PX / 2);
   const now = performance.now();
@@ -2667,7 +2720,7 @@ function drawAtmosphericFog() {
     if (f.y - f.radius > CANVAS_PX) f.y = -f.radius;
     if (f.y + f.radius < 0) f.y = CANVAS_PX + f.radius;
 
-    const alpha = f.baseAlpha * (0.8 + 0.2 * Math.sin(now * f.pulseSpeed + f.phase));
+    const alpha = f.baseAlpha * fogMult * (0.8 + 0.2 * Math.sin(now * f.pulseSpeed + f.phase));
 
     // Distance to player: keep clear vision circle around player
     const dist = Math.hypot(f.x - px, f.y - py);
@@ -2690,9 +2743,9 @@ function drawAtmosphericFog() {
   // 2. Global atmospheric ambient haze with clear vision circle around the player
   const vignette = ctx.createRadialGradient(px, py, 45, px, py, 260);
   vignette.addColorStop(0, 'rgba(10, 18, 30, 0)');
-  vignette.addColorStop(0.35, 'rgba(12, 22, 38, 0.08)');
-  vignette.addColorStop(0.75, 'rgba(15, 28, 48, 0.20)');
-  vignette.addColorStop(1, 'rgba(15, 28, 48, 0.32)');
+  vignette.addColorStop(0.35, `rgba(12, 22, 38, ${0.08 * fogMult})`);
+  vignette.addColorStop(0.75, `rgba(15, 28, 48, ${0.20 * fogMult})`);
+  vignette.addColorStop(1, `rgba(15, 28, 48, ${0.32 * fogMult})`);
 
   ctx.fillStyle = vignette;
   ctx.fillRect(0, 0, CANVAS_PX, CANVAS_PX);
@@ -4891,12 +4944,21 @@ function broadcastDisasterSync() {
     items: items,
     placedTraps: placedTraps,
     placedMines: placedMines,
+    fogWeather: { state: fogWeather.state, currentAlpha: fogWeather.currentAlpha, timer: fogWeather.timer },
   };
   broadcastNetworkMessage(syncMsg);
 }
 
 function applyDisasterSync(sync) {
   if (sync.fireWave !== undefined) fireWave = sync.fireWave;
+
+  if (sync.fogWeather !== undefined && sync.fogWeather) {
+    fogWeather = {
+      state: sync.fogWeather.state,
+      currentAlpha: sync.fogWeather.currentAlpha,
+      timer: sync.fogWeather.timer,
+    };
+  }
 
   if (sync.spreadingFlames) {
     spreadingFlames = new Map();
