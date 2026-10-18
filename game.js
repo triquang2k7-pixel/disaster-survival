@@ -636,6 +636,7 @@ function startGame() {
     if (localSurvivor3D) scene3D.remove(localSurvivor3D.root);
     localSurvivor3D = buildSurvivor3D(equippedSkinId || 'default', 'Bạn', true);
     scene3D.add(localSurvivor3D.root);
+    cleanUpDisasterMeshes3D();
   }
 
   // "Khi chơi đơn không có khẩu súng"
@@ -2431,6 +2432,8 @@ function updateBombs(dt) {
 
 function updateBombAim(dt) {
   if (trapFrozenTimer > 0) return;
+  if (!bombTarget) bombTarget = { x: 10, y: 13 };
+  if (!player || typeof player.x !== 'number') return;
   const aimSpeed = 9.5 * (dt / 1000); // 9.5 ô/giây lướt mượt mà
 
   if (aimKeysDown.has('aim_up')) bombTarget.y -= aimSpeed;
@@ -2634,11 +2637,19 @@ function updateWarningBanners() {
 }
 
 function showWarning(text) {
+  if (!elWarnText || !elWarn) return;
   elWarnText.textContent = text;
   elWarn.classList.remove('hidden');
 }
 function hideWarning() {
-  elWarn.classList.add('hidden');
+  if (elWarn) elWarn.classList.add('hidden');
+}
+function showHazardWarning(text, duration = 3000) {
+  showWarning(text);
+  if (showHazardWarning._timer) clearTimeout(showHazardWarning._timer);
+  showHazardWarning._timer = setTimeout(() => {
+    hideWarning();
+  }, duration);
 }
 
 // ── Game loop (Optimized 60 FPS) ─────────────
@@ -4353,7 +4364,7 @@ let ambientLight3D, dirLight3D, rimLight3D;
 let pointLightFire3D, pointLightLightning3D, pointLightBomb3D;
 
 let tileMeshes3D = [];
-let matTileNormal3D, matTileScorched3D, matTileWater3D, matTileElectric3D, matTileSinkhole3D;
+let matTileNormal3D, matTileFire3D, matTileFireWarn3D, matTileScorched3D, matTileWater3D, matTileElectric3D, matTileLightningWarn3D, matTileSinkhole3D, matTileLandslideWarn3D, matTileCrater3D;
 
 let localSurvivor3D = null;
 const remoteSurvivors3D = new Map();
@@ -4362,6 +4373,9 @@ let reticle3D = null;
 let trajectoryLine3D = null;
 
 const thrownBombMeshes3D = new Map();
+const hazardBombs3D = new Map();
+const fireFlames3D = new Map();
+const shockwaveMeshes3D = new Map();
 const itemMeshes3D = new Map();
 const trapMeshes3D = new Map();
 const mineMeshes3D = new Map();
@@ -4393,87 +4407,128 @@ function init3DScene() {
   if (!webglCanvas) return;
 
   scene3D = new THREE.Scene();
-  scene3D.background = new THREE.Color(0x060913);
-  scene3D.fog = new THREE.FogExp2(0x060913, 0.02);
+  scene3D.background = null; // 100% transparent background - eliminates any dark square box covering the scene
 
-  camera3D = new THREE.PerspectiveCamera(46, 1, 0.1, 1000);
-  camera3D.position.set(GRID / 2, 19.5, GRID / 2 + 14.8);
+  // Elevated camera with generous FOV and viewing angle so all 4 corners are 100% visible
+  camera3D = new THREE.PerspectiveCamera(42, 1, 0.1, 1000);
+  camera3D.position.set(GRID / 2, 27.5, GRID / 2 + 18.5);
   camera3D.lookAt(GRID / 2, 0, GRID / 2 - 0.2);
 
   renderer3D = new THREE.WebGLRenderer({
     canvas: webglCanvas,
     antialias: true,
-    alpha: false,
+    alpha: true,
     powerPreference: 'high-performance'
   });
+  renderer3D.setClearColor(0x000000, 0); // Transparent canvas background
   renderer3D.setSize(CANVAS_PX, CANVAS_PX);
   renderer3D.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer3D.shadowMap.enabled = true;
   renderer3D.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer3D.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer3D.toneMappingExposure = 1.15;
+  renderer3D.toneMappingExposure = 1.25;
 
   // Lights
-  ambientLight3D = new THREE.AmbientLight(0x334155, 0.85);
+  ambientLight3D = new THREE.AmbientLight(0x475569, 0.95);
   scene3D.add(ambientLight3D);
 
-  dirLight3D = new THREE.DirectionalLight(0xfff7ed, 1.35);
-  dirLight3D.position.set(16, 26, 22);
+  dirLight3D = new THREE.DirectionalLight(0xfff7ed, 1.45);
+  dirLight3D.position.set(16, 30, 24);
   dirLight3D.castShadow = true;
   dirLight3D.shadow.mapSize.set(1024, 1024);
   dirLight3D.shadow.camera.near = 0.5;
-  dirLight3D.shadow.camera.far = 60;
-  dirLight3D.shadow.camera.left = -16;
-  dirLight3D.shadow.camera.right = 16;
-  dirLight3D.shadow.camera.top = 16;
-  dirLight3D.shadow.camera.bottom = -16;
+  dirLight3D.shadow.camera.far = 70;
+  dirLight3D.shadow.camera.left = -18;
+  dirLight3D.shadow.camera.right = 18;
+  dirLight3D.shadow.camera.top = 18;
+  dirLight3D.shadow.camera.bottom = -18;
   scene3D.add(dirLight3D);
 
-  rimLight3D = new THREE.DirectionalLight(0x00e5ff, 0.5);
-  rimLight3D.position.set(-14, 12, -14);
+  rimLight3D = new THREE.DirectionalLight(0x00e5ff, 0.65);
+  rimLight3D.position.set(-16, 14, -16);
   scene3D.add(rimLight3D);
 
-  pointLightFire3D = new THREE.PointLight(0xff4500, 0, 24);
-  pointLightFire3D.position.set(GRID / 2, 2, GRID / 2);
+  pointLightFire3D = new THREE.PointLight(0xff3d00, 0, 32);
+  pointLightFire3D.position.set(GRID / 2, 2.5, GRID / 2);
   scene3D.add(pointLightFire3D);
 
-  pointLightLightning3D = new THREE.PointLight(0x00f0ff, 0, 36);
-  pointLightLightning3D.position.set(GRID / 2, 5, GRID / 2);
+  pointLightLightning3D = new THREE.PointLight(0x00f0ff, 0, 40);
+  pointLightLightning3D.position.set(GRID / 2, 6, GRID / 2);
   scene3D.add(pointLightLightning3D);
 
-  pointLightBomb3D = new THREE.PointLight(0xfbbf24, 0, 24);
-  pointLightBomb3D.position.set(GRID / 2, 1.5, GRID / 2);
+  pointLightBomb3D = new THREE.PointLight(0xfbbf24, 0, 26);
+  pointLightBomb3D.position.set(GRID / 2, 2, GRID / 2);
   scene3D.add(pointLightBomb3D);
 
-  // Floating Cyber Arena Base
-  const baseGeo = new THREE.BoxGeometry(GRID + 1.6, 1.2, GRID + 1.6);
-  const baseMat = new THREE.MeshStandardMaterial({ color: 0x090d16, roughness: 0.85, metalness: 0.4 });
+  // Floating Cyber Arena Base (Clean seamless platform - perfectly hugs the 20x20 grid)
+  const baseGeo = new THREE.BoxGeometry(GRID + 0.35, 0.8, GRID + 0.35);
+  const baseMat = new THREE.MeshStandardMaterial({ color: 0x0a101d, roughness: 0.85, metalness: 0.4 });
   const baseMesh = new THREE.Mesh(baseGeo, baseMat);
-  baseMesh.position.set(GRID / 2, -0.65, GRID / 2);
+  baseMesh.position.set(GRID / 2, -0.45, GRID / 2);
   baseMesh.receiveShadow = true;
   scene3D.add(baseMesh);
 
-  // Glowing Neon Trim
-  const borderMat = new THREE.MeshBasicMaterial({ color: 0x00e5ff });
-  const b1 = new THREE.Mesh(new THREE.BoxGeometry(GRID + 0.1, 0.06, 0.12), borderMat);
-  b1.position.set(GRID / 2, 0.02, 0);
-  scene3D.add(b1);
-  const b2 = new THREE.Mesh(new THREE.BoxGeometry(GRID + 0.1, 0.06, 0.12), borderMat);
-  b2.position.set(GRID / 2, 0.02, GRID);
-  scene3D.add(b2);
-  const b3 = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.06, GRID + 0.1), borderMat);
-  b3.position.set(0, 0.02, GRID / 2);
-  scene3D.add(b3);
-  const b4 = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.06, GRID + 0.1), borderMat);
-  b4.position.set(GRID, 0.02, GRID / 2);
-  scene3D.add(b4);
-
-  // 20x20 Tiles
-  matTileNormal3D = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.6, metalness: 0.35 });
-  matTileScorched3D = new THREE.MeshStandardMaterial({ color: 0x18181b, emissive: 0xea580c, emissiveIntensity: 0.85, roughness: 0.8 });
-  matTileWater3D = new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.1, metalness: 0.7, transparent: true, opacity: 0.85 });
-  matTileElectric3D = new THREE.MeshStandardMaterial({ color: 0x00e5ff, emissive: 0x00e5ff, emissiveIntensity: 1.1 });
-  matTileSinkhole3D = new THREE.MeshStandardMaterial({ color: 0x3e2723, roughness: 0.95 });
+  // Vibrant, High-Intensity 3D Disaster Materials
+  matTileNormal3D = new THREE.MeshStandardMaterial({
+    color: 0x0f172a,
+    roughness: 0.45,
+    metalness: 0.5
+  });
+  matTileFire3D = new THREE.MeshStandardMaterial({
+    color: 0xff3d00,
+    emissive: 0xff2200,
+    emissiveIntensity: 2.8,
+    roughness: 0.2
+  });
+  matTileFireWarn3D = new THREE.MeshStandardMaterial({
+    color: 0xff1744,
+    emissive: 0xff1744,
+    emissiveIntensity: 2.5,
+    roughness: 0.25
+  });
+  matTileScorched3D = new THREE.MeshStandardMaterial({
+    color: 0x241208,
+    emissive: 0xd97706,
+    emissiveIntensity: 0.85,
+    roughness: 0.85
+  });
+  matTileWater3D = new THREE.MeshStandardMaterial({
+    color: 0x00b4d8,
+    emissive: 0x0284c7,
+    emissiveIntensity: 0.55,
+    roughness: 0.08,
+    metalness: 0.85,
+    transparent: true,
+    opacity: 0.92
+  });
+  matTileElectric3D = new THREE.MeshStandardMaterial({
+    color: 0xffea00,
+    emissive: 0x00f0ff,
+    emissiveIntensity: 3.2
+  });
+  matTileLightningWarn3D = new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    emissive: 0x00f0ff,
+    emissiveIntensity: 4.0
+  });
+  matTileSinkhole3D = new THREE.MeshStandardMaterial({
+    color: 0x1f140e,
+    emissive: 0xb45309,
+    emissiveIntensity: 0.45,
+    roughness: 0.95
+  });
+  matTileLandslideWarn3D = new THREE.MeshStandardMaterial({
+    color: 0xff9100,
+    emissive: 0xffab00,
+    emissiveIntensity: 2.2,
+    roughness: 0.35
+  });
+  matTileCrater3D = new THREE.MeshStandardMaterial({
+    color: 0x18181b,
+    emissive: 0x451a03,
+    emissiveIntensity: 0.6,
+    roughness: 0.9
+  });
 
   const tileGeo = new THREE.BoxGeometry(0.94, 0.18, 0.94);
   tileMeshes3D = [];
@@ -4508,8 +4563,8 @@ function init3DScene() {
 
   for (let i = 0; i < 3; i++) {
     const tg = buildTornado3D();
-    tg.visible = false;
-    scene3D.add(tg);
+    tg.group.visible = false;
+    scene3D.add(tg.group);
     tornadoGroups3D.push(tg);
   }
 
@@ -4788,10 +4843,10 @@ function buildLightningBolt3D() {
 function buildTornado3D() {
   const group = new THREE.Group();
   const ringLevels = [
-    { y: 0.3, r: 0.45, count: 40, size: 0.14 },
-    { y: 1.5, r: 1.0, count: 60, size: 0.18 },
-    { y: 3.2, r: 1.6, count: 80, size: 0.22 },
-    { y: 5.0, r: 2.3, count: 100, size: 0.26 }
+    { y: 0.3, r: 0.5, count: 45, size: 0.16, color: 0x00e5ff },
+    { y: 1.5, r: 1.1, count: 65, size: 0.20, color: 0x38bdf8 },
+    { y: 3.2, r: 1.8, count: 85, size: 0.24, color: 0xffffff },
+    { y: 5.2, r: 2.6, count: 110, size: 0.28, color: 0x818cf8 }
   ];
 
   for (const lvl of ringLevels) {
@@ -4806,49 +4861,157 @@ function buildTornado3D() {
     }
     geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     const mat = new THREE.PointsMaterial({
-      color: 0x94a3b8,
+      color: lvl.color,
       size: lvl.size,
       transparent: true,
-      opacity: 0.75
+      opacity: 0.85
     });
     const p = new THREE.Points(geo, mat);
-    p.userData = { speed: (Math.random() > 0.5 ? 1 : -1) * (0.03 + Math.random() * 0.02) };
+    p.userData = { speed: (Math.random() > 0.5 ? 1 : -1) * (0.04 + Math.random() * 0.03) };
     group.add(p);
   }
 
+  // Plasma electric sparks in tornado
   const debrisGeo = new THREE.BoxGeometry(0.18, 0.18, 0.18);
-  const debrisMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.9 });
-  for (let i = 0; i < 6; i++) {
+  const debrisMat = new THREE.MeshStandardMaterial({ color: 0x00e5ff, emissive: 0x00e5ff, emissiveIntensity: 0.9 });
+  for (let i = 0; i < 8; i++) {
     const m = new THREE.Mesh(debrisGeo, debrisMat);
-    m.position.set((Math.random() - 0.5) * 2, 1 + Math.random() * 3, (Math.random() - 0.5) * 2);
-    m.userData = { orbitSpeed: 0.04 + Math.random() * 0.03, orbitDist: 0.8 + Math.random() * 1.2, orbitAngle: Math.random() * Math.PI * 2 };
+    m.position.set((Math.random() - 0.5) * 2, 1 + Math.random() * 3.5, (Math.random() - 0.5) * 2);
+    m.userData = { orbitSpeed: 0.05 + Math.random() * 0.04, orbitDist: 0.8 + Math.random() * 1.4, orbitAngle: Math.random() * Math.PI * 2 };
     group.add(m);
   }
 
-  return group;
+  // Ground Warning Ring when forming
+  const warnRingGeo = new THREE.RingGeometry(1.2, 1.6, 24);
+  warnRingGeo.rotateX(-Math.PI / 2);
+  const warnRingMat = new THREE.MeshBasicMaterial({ color: 0xff1744, side: THREE.DoubleSide, transparent: true, opacity: 0.75 });
+  const warnRing = new THREE.Mesh(warnRingGeo, warnRingMat);
+  warnRing.position.y = 0.05;
+  warnRing.visible = false;
+  group.add(warnRing);
+
+  return { group, warnRing };
 }
 
 function buildLavaWall3D() {
   const group = new THREE.Group();
-  const count = 18;
-  const coneGeo = new THREE.ConeGeometry(0.42, 1.4, 6);
+  const count = 22;
+  const coneGeo = new THREE.ConeGeometry(0.52, 2.2, 7);
   const lavaMat = new THREE.MeshStandardMaterial({
     color: 0xff3d00,
-    emissive: 0xff5722,
-    emissiveIntensity: 1.1,
-    roughness: 0.7
+    emissive: 0xff1744,
+    emissiveIntensity: 2.6,
+    roughness: 0.4
   });
 
   for (let i = 0; i < count; i++) {
     const rock = new THREE.Mesh(coneGeo, lavaMat);
-    rock.position.set(0, 0.7, (i / (count - 1) - 0.5) * GRID);
+    rock.position.set(0, 1.0, (i / (count - 1) - 0.5) * GRID);
     rock.rotation.y = Math.random() * Math.PI * 2;
-    rock.rotation.z = (Math.random() - 0.5) * 0.3;
+    rock.rotation.z = (Math.random() - 0.5) * 0.35;
     group.add(rock);
   }
 
   group.visible = false;
   return group;
+}
+
+function createFireFlameMesh3D() {
+  const group = new THREE.Group();
+  const flameMatOuter = new THREE.MeshBasicMaterial({ color: 0xff3d00, transparent: true, opacity: 0.88 });
+  const flameMatInner = new THREE.MeshBasicMaterial({ color: 0xffea00 });
+  const coneOuter = new THREE.Mesh(new THREE.ConeGeometry(0.3, 0.8, 5), flameMatOuter);
+  coneOuter.position.y = 0.4;
+  group.add(coneOuter);
+  const coneInner = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.52, 5), flameMatInner);
+  coneInner.position.y = 0.32;
+  group.add(coneInner);
+  return { group, coneOuter, coneInner };
+}
+
+function createHazardBombMesh3D() {
+  const group = new THREE.Group();
+  const bombGeo = new THREE.SphereGeometry(0.38, 14, 12);
+  const bombMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.85, roughness: 0.25 });
+  const bombMesh = new THREE.Mesh(bombGeo, bombMat);
+  bombMesh.position.y = 0.38;
+  group.add(bombMesh);
+
+  // Red LED dot
+  const ledGeo = new THREE.SphereGeometry(0.08, 8, 8);
+  const ledMat = new THREE.MeshBasicMaterial({ color: 0xff1744 });
+  const led = new THREE.Mesh(ledGeo, ledMat);
+  led.position.y = 0.76;
+  group.add(led);
+
+  // Hazard danger ring on floor
+  const ringGeo = new THREE.RingGeometry(BOMB_BLAST_RADIUS * 0.88, BOMB_BLAST_RADIUS, 28);
+  ringGeo.rotateX(-Math.PI / 2);
+  const ringMat = new THREE.MeshBasicMaterial({ color: 0xffea00, side: THREE.DoubleSide, transparent: true, opacity: 0.65 });
+  const ring = new THREE.Mesh(ringGeo, ringMat);
+  ring.position.y = 0.04;
+  group.add(ring);
+
+  // Ground shadow
+  const shadowGeo = new THREE.CircleGeometry(0.42, 16);
+  shadowGeo.rotateX(-Math.PI / 2);
+  const shadowMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.5 });
+  const shadow = new THREE.Mesh(shadowGeo, shadowMat);
+  shadow.position.y = 0.02;
+  group.add(shadow);
+
+  return { group, bombMesh, led, ledMat, ring, ringMat, shadow };
+}
+
+function createTrapMesh3D() {
+  const group = new THREE.Group();
+  const baseGeo = new THREE.CylinderGeometry(0.32, 0.34, 0.06, 12);
+  const baseMat = new THREE.MeshStandardMaterial({ color: 0xffb300, metalness: 0.8, roughness: 0.3 });
+  const base = new THREE.Mesh(baseGeo, baseMat);
+  base.position.y = 0.03;
+  group.add(base);
+
+  const jawGeo = new THREE.BoxGeometry(0.44, 0.12, 0.06);
+  const jawMat = new THREE.MeshStandardMaterial({ color: 0xd4d4d8, metalness: 0.9, roughness: 0.2 });
+  const j1 = new THREE.Mesh(jawGeo, jawMat);
+  j1.position.set(0, 0.08, -0.16);
+  j1.rotation.x = -0.4;
+  group.add(j1);
+  const j2 = new THREE.Mesh(jawGeo, jawMat);
+  j2.position.set(0, 0.08, 0.16);
+  j2.rotation.x = 0.4;
+  group.add(j2);
+  return group;
+}
+
+function createMineMesh3D() {
+  const group = new THREE.Group();
+  const discGeo = new THREE.CylinderGeometry(0.24, 0.28, 0.05, 16);
+  const discMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.85, roughness: 0.3 });
+  const disc = new THREE.Mesh(discGeo, discMat);
+  disc.position.y = 0.03;
+  group.add(disc);
+
+  const ledGeo = new THREE.SphereGeometry(0.06, 8, 8);
+  const ledMat = new THREE.MeshBasicMaterial({ color: 0xff1744 });
+  const led = new THREE.Mesh(ledGeo, ledMat);
+  led.position.y = 0.08;
+  group.add(led);
+  return { group, ledMat };
+}
+
+function createShockwaveMesh3D() {
+  const geo = new THREE.RingGeometry(0.2, 0.4, 32);
+  geo.rotateX(-Math.PI / 2);
+  const mat = new THREE.MeshBasicMaterial({
+    color: 0xff9100,
+    side: THREE.DoubleSide,
+    transparent: true,
+    opacity: 0.85
+  });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.position.y = 0.06;
+  return { mesh, mat, geo };
 }
 
 function createThrownBombMesh3D() {
@@ -4956,7 +5119,8 @@ function init3DPointerControls() {
   if (!webglCanvas) return;
 
   function handlePointer(clientX, clientY) {
-    if (!running || paused || isSpectator || !camera3D) return;
+    if (!running || paused || isSpectator || !camera3D || !player || typeof player.x !== 'number') return;
+    if (!bombTarget) bombTarget = { x: 10, y: 13 };
     const rect = webglCanvas.getBoundingClientRect();
     const ndcX = ((clientX - rect.left) / rect.width) * 2 - 1;
     const ndcY = -(((clientY - rect.top) / rect.height) * 2 - 1);
@@ -4993,18 +5157,46 @@ function init3DPointerControls() {
 function render3D(dt) {
   if (!is3DReady || !renderer3D || !scene3D || !camera3D) return;
 
-  // 1. Camera Shake
+  // 1. Elevated Camera (Wide 360° Perspective - No corner clipping!)
+  const baseCamX = 10;
+  const baseCamY = 27.5;
+  const baseCamZ = 28.5;
+
   if (camShakeTimer > 0) {
-    const shake = (camShakeTimer / 250) * camShakeIntensity * 0.12;
-    camera3D.position.x = 10 + (Math.random() - 0.5) * shake;
-    camera3D.position.y = 19.5 + (Math.random() - 0.5) * shake;
-    camera3D.position.z = 24.8 + (Math.random() - 0.5) * shake;
+    const shake = (camShakeTimer / 250) * camShakeIntensity * 0.14;
+    camera3D.position.x = baseCamX + (Math.random() - 0.5) * shake;
+    camera3D.position.y = baseCamY + (Math.random() - 0.5) * shake;
+    camera3D.position.z = baseCamZ + (Math.random() - 0.5) * shake;
   } else {
-    camera3D.position.set(10, 19.5, 24.8);
+    camera3D.position.set(baseCamX, baseCamY, baseCamZ);
   }
   camera3D.lookAt(10, 0, 9.8);
 
-  // 2. Update Tiles (20x20)
+  // Pre-calculate Disaster Warnings & Areas for vivid tile coloring
+  let isFireWaveWarn = false;
+  let fireWarnDir = '';
+  if (fireWave && fireWave.state === 'warning') {
+    isFireWaveWarn = true;
+    fireWarnDir = fireWave.dir;
+  }
+
+  const landslideWarnCells = new Set();
+  if (landslide && landslide.state === 'warning') {
+    for (const z of landslide.zones) {
+      for (const c of z.cells) {
+        landslideWarnCells.add(`${c.x},${c.y}`);
+      }
+    }
+  }
+
+  const craterCells = new Set();
+  for (const cr of craters) {
+    for (const c of cr.cells) {
+      craterCells.add(`${c.x},${c.y}`);
+    }
+  }
+
+  // 2. Update Tiles (20x20) with Vibrant Disaster Colors
   for (let x = 0; x < GRID; x++) {
     for (let z = 0; z < GRID; z++) {
       const tile = tileMeshes3D[x][z];
@@ -5012,18 +5204,40 @@ function render3D(dt) {
 
       if (sinkholeCells.has(key)) {
         tile.material = matTileSinkhole3D;
-        tile.position.y = THREE.MathUtils.lerp(tile.position.y, -0.55, 0.18);
+        tile.position.y = THREE.MathUtils.lerp(tile.position.y, -0.65, 0.2);
         tile.rotation.x = 0.08;
       } else {
-        tile.position.y = THREE.MathUtils.lerp(tile.position.y, -0.09, 0.18);
+        tile.position.y = THREE.MathUtils.lerp(tile.position.y, -0.09, 0.2);
         tile.rotation.x = 0;
 
-        if (electrifiedPuddles.has(key)) {
+        let isEdgeFireWarn = false;
+        if (isFireWaveWarn) {
+          if (fireWarnDir === 'left' && x <= 2) isEdgeFireWarn = true;
+          else if (fireWarnDir === 'right' && x >= GRID - 3) isEdgeFireWarn = true;
+          else if (fireWarnDir === 'top' && z <= 2) isEdgeFireWarn = true;
+          else if (fireWarnDir === 'bottom' && z >= GRID - 3) isEdgeFireWarn = true;
+          else if (fireWarnDir === 'diag-tl' && (x + z <= 3)) isEdgeFireWarn = true;
+          else if (fireWarnDir === 'diag-tr' && (GRID - 1 - x + z <= 3)) isEdgeFireWarn = true;
+          else if (fireWarnDir === 'diag-bl' && (x + GRID - 1 - z <= 3)) isEdgeFireWarn = true;
+          else if (fireWarnDir === 'diag-br' && (GRID - 1 - x + GRID - 1 - z <= 3)) isEdgeFireWarn = true;
+        }
+
+        if (lightningCells.has(key)) {
+          tile.material = matTileLightningWarn3D;
+        } else if (electrifiedPuddles.has(key)) {
           tile.material = matTileElectric3D;
         } else if (puddleCells.has(key)) {
           tile.material = matTileWater3D;
-        } else if (fireCells.has(key) || burntGrass.has(key) || spreadingFlames.has(key)) {
+        } else if (fireCells.has(key) || spreadingFlames.has(key)) {
+          tile.material = matTileFire3D;
+        } else if (burntGrass.has(key)) {
           tile.material = matTileScorched3D;
+        } else if (isEdgeFireWarn) {
+          tile.material = matTileFireWarn3D;
+        } else if (landslideWarnCells.has(key)) {
+          tile.material = matTileLandslideWarn3D;
+        } else if (craterCells.has(key)) {
+          tile.material = matTileCrater3D;
         } else {
           tile.material = matTileNormal3D;
         }
@@ -5190,8 +5404,9 @@ function render3D(dt) {
     }
   }
 
-  // 7. Update Disasters
-  // Volcano Lava Wall
+  // 7. Update Disasters (Vibrant 3D Hazard Effects)
+  // 7.1 Volcano Lava Wall & Fire Glow
+  const allFireCount = fireCells.size + spreadingFlames.size;
   if (lavaWallGroup3D) {
     if (fireWave && fireWave.state === 'sweeping') {
       lavaWallGroup3D.visible = true;
@@ -5209,15 +5424,153 @@ function render3D(dt) {
         lavaWallGroup3D.position.set(GRID / 2, 0, GRID - front);
         lavaWallGroup3D.rotation.y = -Math.PI / 2;
       }
-      pointLightFire3D.intensity = 2.8;
-      pointLightFire3D.position.set(lavaWallGroup3D.position.x, 2, lavaWallGroup3D.position.z);
+      pointLightFire3D.intensity = 4.8;
+      pointLightFire3D.position.set(lavaWallGroup3D.position.x, 2.5, lavaWallGroup3D.position.z);
+    } else if (allFireCount > 0) {
+      lavaWallGroup3D.visible = false;
+      pointLightFire3D.intensity = Math.min(4.5, 1.2 + allFireCount * 0.15);
+      pointLightFire3D.position.set(GRID / 2, 2.5, GRID / 2);
     } else {
       lavaWallGroup3D.visible = false;
       pointLightFire3D.intensity = 0;
     }
   }
 
-  // Rain
+  // 7.2 Dancing 3D Fire Flames on Burning Cells
+  const activeFlameKeys = new Set();
+  const allFireKeys = new Set([...fireCells, ...spreadingFlames.keys()]);
+  for (const key of allFireKeys) {
+    if (typeof key !== 'string' || !key.includes(',')) continue;
+    activeFlameKeys.add(key);
+    const [fx, fz] = key.split(',').map(Number);
+    if (isNaN(fx) || isNaN(fz)) continue;
+    let fl = fireFlames3D.get(key);
+    if (!fl) {
+      fl = createFireFlameMesh3D();
+      fl.group.position.set(fx + 0.5, 0, fz + 0.5);
+      scene3D.add(fl.group);
+      fireFlames3D.set(key, fl);
+    }
+    const flicker = 0.8 + Math.sin(performance.now() * 0.018 + fx * 3 + fz * 2) * 0.35;
+    fl.group.scale.set(1, flicker, 1);
+    fl.group.rotation.y += dt * 0.005;
+  }
+  for (const [k, fl] of fireFlames3D.entries()) {
+    if (!activeFlameKeys.has(k)) {
+      scene3D.remove(fl.group);
+      fireFlames3D.delete(k);
+    }
+  }
+
+  // 7.3 Sky-dropped Hazard Bombs
+  const activeHazardBombIds = new Set();
+  for (let i = 0; i < bombs.length; i++) {
+    const bm = bombs[i];
+    const bombId = bm.id || `hazard_bomb_${i}_${bm.gx}_${bm.gy}`;
+    activeHazardBombIds.add(bombId);
+
+    let bObj = hazardBombs3D.get(bombId);
+    if (!bObj) {
+      bObj = createHazardBombMesh3D();
+      scene3D.add(bObj.group);
+      hazardBombs3D.set(bombId, bObj);
+    }
+
+    const bx = bm.gx + 0.5;
+    const bz = bm.gy + 0.5;
+    bObj.group.position.set(bx, 0, bz);
+
+    if (bm.state === 'falling') {
+      const prog = Math.min(1, Math.max(0, bm.stateTime / BOMB_FALL_TIME));
+      const curY = 14 * (1 - prog) + 0.38;
+      bObj.bombMesh.position.y = curY;
+      bObj.led.position.y = curY + 0.38;
+      bObj.shadow.scale.setScalar(0.3 + prog * 0.7);
+      bObj.ring.visible = false;
+    } else if (bm.state === 'fuse') {
+      bObj.bombMesh.position.y = 0.38;
+      bObj.led.position.y = 0.76;
+      bObj.ring.visible = true;
+      const urgency = bm.stateTime / bm.fuseTime;
+      const isRed = Math.floor(bm.stateTime / (urgency > 0.6 ? 80 : 150)) % 2 === 0;
+      bObj.ledMat.color.setHex(isRed ? 0xff1744 : 0xffea00);
+      bObj.ringMat.color.setHex(urgency > 0.6 ? 0xff1744 : 0xffea00);
+      bObj.ring.scale.setScalar(1 + Math.sin(bm.stateTime * 0.02) * 0.08);
+    }
+  }
+  for (const [id, bObj] of hazardBombs3D.entries()) {
+    if (!activeHazardBombIds.has(id)) {
+      scene3D.remove(bObj.group);
+      hazardBombs3D.delete(id);
+    }
+  }
+
+  // 7.4 Placed Traps in 3D
+  const activeTrapIds = new Set();
+  for (const tr of placedTraps) {
+    activeTrapIds.add(tr.id);
+    let tm = trapMeshes3D.get(tr.id);
+    if (!tm) {
+      tm = createTrapMesh3D();
+      tm.position.set(tr.x + 0.5, 0.02, tr.y + 0.5);
+      scene3D.add(tm);
+      trapMeshes3D.set(tr.id, tm);
+    }
+  }
+  for (const [id, tm] of trapMeshes3D.entries()) {
+    if (!activeTrapIds.has(id)) {
+      scene3D.remove(tm);
+      trapMeshes3D.delete(id);
+    }
+  }
+
+  // 7.5 Placed Mines in 3D
+  const activeMineIds = new Set();
+  for (const mn of placedMines) {
+    activeMineIds.add(mn.id);
+    let mm = mineMeshes3D.get(mn.id);
+    if (!mm) {
+      mm = createMineMesh3D();
+      mm.group.position.set(mn.x + 0.5, 0.02, mn.y + 0.5);
+      scene3D.add(mm.group);
+      mineMeshes3D.set(mn.id, mm);
+    }
+    const isLocalMine = mn.ownerSlot === mySlot;
+    mm.group.visible = isLocalMine || mn.steppedOff;
+    mm.ledMat.color.setHex(Math.floor(performance.now() / 250) % 2 === 0 ? 0xff1744 : 0x475569);
+  }
+  for (const [id, mm] of mineMeshes3D.entries()) {
+    if (!activeMineIds.has(id)) {
+      scene3D.remove(mm.group);
+      mineMeshes3D.delete(id);
+    }
+  }
+
+  // 7.6 3D Shockwaves
+  const activeShockwaveIndices = new Set();
+  for (let i = 0; i < shockwaves.length; i++) {
+    const sw = shockwaves[i];
+    activeShockwaveIndices.add(i);
+    let sm = shockwaveMeshes3D.get(i);
+    if (!sm) {
+      sm = createShockwaveMesh3D();
+      scene3D.add(sm.mesh);
+      shockwaveMeshes3D.set(i, sm);
+    }
+    const progress = 1 - (sw.life / sw.maxLife);
+    const curR = Math.max(0.2, (sw.r + (sw.maxR - sw.r) * progress) / CELL);
+    sm.mesh.position.set(sw.x / CELL, 0.06, sw.y / CELL);
+    sm.mesh.scale.set(curR, curR, 1);
+    sm.mat.opacity = Math.max(0, (1 - progress) * 0.9);
+  }
+  for (const [idx, sm] of shockwaveMeshes3D.entries()) {
+    if (!activeShockwaveIndices.has(idx)) {
+      scene3D.remove(sm.mesh);
+      shockwaveMeshes3D.delete(idx);
+    }
+  }
+
+  // 7.7 Rain & Lightning Flash
   if (rainParticles3D) {
     if (thunderstorm) {
       rainParticles3D.visible = true;
@@ -5235,7 +5588,6 @@ function render3D(dt) {
       }
       posAttr.needsUpdate = true;
 
-      // Lightning strike check
       let activeStrike = null;
       if (thunderstorm.strikes) {
         activeStrike = thunderstorm.strikes.find(s => s.state === 'striking');
@@ -5245,37 +5597,49 @@ function render3D(dt) {
         const sx = activeStrike.cx;
         const sz = activeStrike.cy;
         const boltPoints = [
-          new THREE.Vector3(sx + (Math.random() - 0.5) * 4, 22, sz + (Math.random() - 0.5) * 4),
-          new THREE.Vector3(sx + 1.2, 16, sz - 0.8),
-          new THREE.Vector3(sx - 0.9, 11, sz + 1.1),
+          new THREE.Vector3(sx + (Math.random() - 0.5) * 4, 24, sz + (Math.random() - 0.5) * 4),
+          new THREE.Vector3(sx + 1.2, 18, sz - 0.8),
+          new THREE.Vector3(sx - 0.9, 12, sz + 1.1),
           new THREE.Vector3(sx + 0.6, 6, sz - 0.5),
           new THREE.Vector3(sx, 0, sz)
         ];
         lightningBolt3D.boltGeo.setFromPoints(boltPoints);
         lightningBolt3D.group.visible = true;
-        pointLightLightning3D.intensity = 6.0;
-        pointLightLightning3D.position.set(sx, 4, sz);
+        pointLightLightning3D.intensity = 10.0;
+        pointLightLightning3D.position.set(sx, 5, sz);
+        ambientLight3D.intensity = 1.8;
       } else {
         lightningBolt3D.group.visible = false;
         pointLightLightning3D.intensity = Math.max(0, pointLightLightning3D.intensity - dt * 0.015);
+        ambientLight3D.intensity = THREE.MathUtils.lerp(ambientLight3D.intensity, 0.95, 0.1);
       }
     } else {
       rainParticles3D.visible = false;
       lightningBolt3D.group.visible = false;
       pointLightLightning3D.intensity = 0;
+      ambientLight3D.intensity = 0.95;
     }
   }
 
-  // Tornadoes
+  // 7.8 Tornadoes (Vibrant Vortex + Warning Rings)
   for (let i = 0; i < tornadoGroups3D.length; i++) {
     const tg = tornadoGroups3D[i];
-    if (i < tornadoes.length && tornadoes[i].state === 'active') {
+    if (i < tornadoes.length && (tornadoes[i].state === 'active' || tornadoes[i].state === 'warning')) {
       const t = tornadoes[i];
-      tg.visible = true;
-      tg.position.set(t.x / CELL, 0, t.y / CELL);
-      tg.rotation.y += dt * 0.025;
+      tg.group.visible = true;
+      tg.group.position.set(t.x / CELL, 0, t.y / CELL);
+
+      if (t.state === 'warning') {
+        if (tg.warnRing) {
+          tg.warnRing.visible = true;
+          tg.warnRing.scale.setScalar(1 + Math.sin(performance.now() * 0.015) * 0.25);
+        }
+      } else {
+        if (tg.warnRing) tg.warnRing.visible = false;
+        tg.group.rotation.y += dt * 0.03;
+      }
     } else {
-      tg.visible = false;
+      tg.group.visible = false;
     }
   }
 
@@ -6147,6 +6511,30 @@ function updateMultiHud() {
   }
 }
 
+function cleanUpDisasterMeshes3D() {
+  if (!scene3D) return;
+  if (typeof fireFlames3D !== 'undefined') {
+    for (const [k, fl] of fireFlames3D.entries()) scene3D.remove(fl.group);
+    fireFlames3D.clear();
+  }
+  if (typeof hazardBombs3D !== 'undefined') {
+    for (const [id, bm] of hazardBombs3D.entries()) scene3D.remove(bm.group);
+    hazardBombs3D.clear();
+  }
+  if (typeof trapMeshes3D !== 'undefined') {
+    for (const [id, tm] of trapMeshes3D.entries()) scene3D.remove(tm);
+    trapMeshes3D.clear();
+  }
+  if (typeof mineMeshes3D !== 'undefined') {
+    for (const [id, mm] of mineMeshes3D.entries()) scene3D.remove(mm.group);
+    mineMeshes3D.clear();
+  }
+  if (typeof shockwaveMeshes3D !== 'undefined') {
+    for (const [idx, sm] of shockwaveMeshes3D.entries()) scene3D.remove(sm.mesh);
+    shockwaveMeshes3D.clear();
+  }
+}
+
 function leaveOnlineRoom() {
   if (joinWatchdogTimer) {
     clearTimeout(joinWatchdogTimer);
@@ -6193,6 +6581,7 @@ function leaveOnlineRoom() {
     }
     remoteSurvivors3D.clear();
   }
+  cleanUpDisasterMeshes3D();
 
   if (elMultiHud) elMultiHud.classList.add('hidden');
   if (elViewOnlineLobby) elViewOnlineLobby.classList.add('hidden');
@@ -6240,6 +6629,7 @@ function returnToLobby() {
     }
     remoteSurvivors3D.clear();
   }
+  cleanUpDisasterMeshes3D();
 
   elOverMultiGO.classList.add('hidden');
   elOverOnline.classList.remove('hidden');

@@ -368,32 +368,23 @@ body {
   to   { transform: translateX(-50%) translateY(0); opacity: 1; }
 }
 
-/* ── Canvas wrapper ───────────────────────────── */
+/* ── Canvas wrapper (Borderless & Unobstructed 360° View) ───────────── */
 .canvas-wrapper {
   position: relative;
-  width: min(740px, calc(100vw - 20px), 74vh);
-  height: min(740px, calc(100vw - 20px), 74vh);
+  width: min(780px, calc(100vw - 16px), 76vh);
+  height: min(780px, calc(100vw - 16px), 76vh);
   aspect-ratio: 1 / 1;
   max-width: 100%;
   margin: 0 auto;
-  border-radius: 24px;
-  overflow: hidden;
-  border: 2px solid rgba(0, 229, 255, .32);
-  box-shadow:
-    0 0 45px rgba(0, 229, 255, .18),
-    0 0 90px rgba(124, 77, 255, .12),
-    0 25px 65px rgba(0, 0, 0, .8),
-    inset 0 0 0 1px rgba(255, 255, 255, .08);
-  background: #020617;
-  transition: box-shadow .3s;
+  border: none !important;
+  border-radius: 0 !important;
+  overflow: visible !important;
+  box-shadow: none !important;
+  background: transparent !important;
   touch-action: none;
 }
 .canvas-wrapper:hover {
-  box-shadow:
-    0 0 50px rgba(0, 229, 255, .22),
-    0 0 90px rgba(124, 77, 255, .12),
-    0 20px 50px rgba(0, 0, 0, .7),
-    inset 0 0 0 1px rgba(255, 255, 255, .08);
+  box-shadow: none !important;
 }
 
 canvas {
@@ -402,7 +393,8 @@ canvas {
   height: 100% !important;
   aspect-ratio: 1 / 1;
   touch-action: none;
-  background: #020617;
+  background: transparent !important;
+  border: none !important;
 }
 
 /* ── Overlays ─────────────────────────────────── */
@@ -413,8 +405,11 @@ canvas {
   justify-content: center;
   overflow-y: auto;
   overflow-x: hidden;
-  background: rgba(5, 10, 14, .92);
-  backdrop-filter: blur(12px);
+  border-radius: 22px;
+  border: 1px solid rgba(0, 229, 255, .25);
+  box-shadow: 0 16px 50px rgba(0, 0, 0, .85);
+  background: rgba(5, 10, 14, .94);
+  backdrop-filter: blur(14px);
   animation: overlayIn .35s cubic-bezier(.4,0,.2,1);
 }
 @keyframes overlayIn {
@@ -1997,8 +1992,9 @@ canvas {
   width: 100% !important;
   height: 100% !important;
   display: block;
-  border-radius: 18px;
-  background: #020617;
+  border-radius: 0 !important;
+  border: none !important;
+  background: transparent !important;
   touch-action: none;
 }
 
