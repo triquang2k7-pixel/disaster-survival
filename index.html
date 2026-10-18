@@ -11,7 +11,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;800;900&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=2.6.0">
+  <link rel="stylesheet" href="style.css?v=3.0.0">
+  <script src="three.min.js"></script>
   <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 </head>
 <body>
@@ -136,7 +137,18 @@
           </span>
           <span class="slot-count" id="countMine">x1</span>
         </button>
-        <button class="inv-slot gun-slot" id="slotGun" onclick="shootGun()" title="Nhấn phím 3, F, Space hoặc click để bắn">
+        <button class="inv-slot bomb-slot" id="slotBomb" onclick="throwBomb()" title="Nhấn phím F để Quăng Bom (Mũi tên để ngắm)">
+          <span class="slot-key">F</span>
+          <span class="slot-icon">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="14" r="7" fill="rgba(245,158,11,0.2)"/>
+              <path d="M12 7V3M15 4l-3 3M9 4l3 3"/>
+              <circle cx="15" cy="11" r="1.5" fill="#fff"/>
+            </svg>
+          </span>
+          <span class="slot-count" id="countBomb">x3</span>
+        </button>
+        <button class="inv-slot gun-slot" id="slotGun" onclick="shootGun()" title="Nhấn phím 3, Space hoặc click để bắn">
           <span class="slot-key">3</span>
           <span class="slot-icon">
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#ff9100" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -166,7 +178,8 @@
 
     <!-- Game canvas wrapper -->
     <div class="canvas-wrapper" id="canvasWrapper">
-      <canvas id="gameCanvas"></canvas>
+      <canvas id="webglCanvas"></canvas>
+      <canvas id="gameCanvas" style="display: none;"></canvas>
 
       <!-- Overlay: Start -->
       <div class="overlay" id="overlayStart">
@@ -477,6 +490,12 @@
             <span class="circle-badge red-badge" id="mobileCountMine">x1</span>
             <span class="btn-subtext">Mìn</span>
           </button>
+          <!-- Quăng Bom Circle -->
+          <button class="circle-btn bomb-btn" id="mobileBtnBomb" onclick="throwBomb()" title="Quăng Bom (Phím F)">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#f59e0b" stroke-width="2.2"><circle cx="12" cy="14" r="7" fill="rgba(245,158,11,0.2)"/><path d="M12 7V3M15 4l-3 3M9 4l3 3"/><circle cx="15" cy="11" r="1.5" fill="#fff"/></svg>
+            <span class="circle-badge yellow-badge" id="mobileCountBomb">x3</span>
+            <span class="btn-subtext">BOM</span>
+          </button>
         </div>
         <!-- Bắn Main Circle Button -->
         <button class="circle-btn shoot-btn" id="mobileBtnShoot" onclick="shootGun()" title="Bắn súng">
@@ -489,11 +508,11 @@
 
     <!-- Footer -->
     <footer class="game-footer">
-      <span><kbd>WASD</kbd> di chuyển (nhả ra dừng) · <kbd>Space</kbd>/<kbd>F</kbd>/<kbd>3</kbd>/Click Bắn · <kbd>P</kbd> Tạm dừng · <kbd>ESC</kbd> Thoát game</span>
+      <span><kbd>WASD</kbd> di chuyển (nhả ra dừng) · <kbd>Mũi tên</kbd> ngắm ném bom · <kbd>F</kbd> quăng bom · <kbd>Space</kbd>/Click bắn · <kbd>P</kbd> tạm dừng · <kbd>ESC</kbd> thoát</span>
       <span class="pause-indicator hidden" id="pauseIndicator">ĐÃ TẠM DỪNG</span>
     </footer>
   </div>
 
-  <script src="game.js?v=2.6.0"></script>
+  <script src="game.js?v=3.0.0"></script>
 </body>
 </html>

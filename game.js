@@ -19,36 +19,44 @@ let currentSpeed = 'normal';
 
 const MAX_HP = 100;
 
-// Disaster Timers
-const FIRE_INTERVAL_MIN = 13000;
-const FIRE_INTERVAL_MAX = 18000;
-const FIRE_WARN_TIME = 4200;
-const FIRE_SWEEP_SPEED = 170;
-const FIRE_BURN_TIME = 2500;
+// Disaster Timers (Đã tinh chỉnh logic và thời gian hợp lý hơn, cảnh báo 2.4s - 2.8s vừa đủ phản xạ)
+const FIRE_INTERVAL_MIN     = 14000;
+const FIRE_INTERVAL_MAX     = 22000;
+const FIRE_WARN_TIME        = 2800; // 2.8s báo trước hợp lý, không bắt người chơi đợi lâu
+const FIRE_SWEEP_SPEED      = 140;  // 140ms/cell quét mượt mà
+const FIRE_BURN_TIME        = 2600;
 
-const THUNDER_INTERVAL_MIN = 15000;
-const THUNDER_INTERVAL_MAX = 21000;
-const THUNDER_WARN_TIME = 4200;
-const THUNDER_STRIKE_TIME = 600;
-const THUNDER_SHOCK_TIME = 2500;
+const THUNDER_INTERVAL_MIN  = 16000;
+const THUNDER_INTERVAL_MAX  = 24000;
+const THUNDER_WARN_TIME     = 2600; // 2.6s báo trước bão
+const THUNDER_STRIKE_TIME   = 700;  // 700ms vòng điện báo trước điểm sét đánh để người chơi né
+const THUNDER_SHOCK_TIME    = 2500;
 
-const TORNADO_INTERVAL_MIN = 16000;
-const TORNADO_INTERVAL_MAX = 23000;
-const TORNADO_WARN_TIME = 3800;
-const TORNADO_DURATION = 11000;
+const TORNADO_INTERVAL_MIN  = 18000;
+const TORNADO_INTERVAL_MAX  = 26000;
+const TORNADO_WARN_TIME     = 2600; // 2.6s lốc hình thành
+const TORNADO_DURATION      = 12000;
 
-const LANDSLIDE_INTERVAL_MIN = 17000;
-const LANDSLIDE_INTERVAL_MAX = 24000;
-const LANDSLIDE_WARN_TIME = 4200;
-const LANDSLIDE_COLLAPSE_TIME = 6500;
+const LANDSLIDE_INTERVAL_MIN = 19000;
+const LANDSLIDE_INTERVAL_MAX = 28000;
+const LANDSLIDE_WARN_TIME    = 2400; // 2.4s nứt đất báo trước
+const LANDSLIDE_COLLAPSE_TIME = 7500;
 
-const BOMB_INTERVAL_MIN = 11000;
-const BOMB_INTERVAL_MAX = 16000;
-const BOMB_FUSE_TIME = 4500;
-const BOMB_BLAST_RADIUS = 2;
-const BOMB_CRATER_DURATION = 4000;
+const BOMB_INTERVAL_MIN     = 14000;
+const BOMB_INTERVAL_MAX     = 20000;
+const BOMB_FUSE_TIME        = 3500;
+const BOMB_BLAST_RADIUS     = 2.2;
+const BOMB_CRATER_DURATION  = 4000;
 
-const ITEM_SPAWN_INTERVAL = 6500;
+const ITEM_SPAWN_INTERVAL   = 6000;
+
+// Bomb Throwing System Constants & State (Quăng Bom)
+const BOMB_THROW_MAX_RANGE  = 7.5;
+const BOMB_THROW_COOLDOWN   = 1200; // 1.2s hồi chiêu quăng bom
+let bombAmmo = 3;
+let bombCooldown = 0;
+let bombTarget = { x: 10, y: 13 };
+let thrownBombs = [];
 
 // Gun Constants
 const GUN_BULLET_SPEED = 6; // pixels per frame
@@ -347,6 +355,7 @@ let tornadoConvergenceTimer = 0;
 let isTornadoConverging = false;
 let mpMoveSyncTimer = 0;
 const keysDown = new Set();
+const aimKeysDown = new Set();
 
 let burnDuration = 0;
 let burnTickCooldown = 0;
@@ -615,6 +624,19 @@ function startGame() {
   hp = MAX_HP;
   damageCooldown = 0;
   trapFrozenTimer = 0;
+  bombAmmo = 3; // Cả chơi đơn và online đều có Bom để quăng!
+  bombCooldown = 0;
+  thrownBombs = [];
+  bombTarget = {
+    x: Math.max(1, Math.min(GRID - 2, spawn.x + (spawn.x < GRID / 2 ? 3.5 : -3.5))),
+    y: spawn.y
+  };
+
+  if (scene3D) {
+    if (localSurvivor3D) scene3D.remove(localSurvivor3D.root);
+    localSurvivor3D = buildSurvivor3D(equippedSkinId || 'default', 'Bạn', true);
+    scene3D.add(localSurvivor3D.root);
+  }
 
   // "Khi chơi đơn không có khẩu súng"
   if (!isMultiplayer) {
@@ -780,15 +802,19 @@ function updateInventoryUI() {
   if (elCountTrap) elCountTrap.textContent = 'x' + trapCount;
   if (elCountMine) elCountMine.textContent = 'x' + mineCount;
   if (elCountGun) elCountGun.textContent = 'x' + gunAmmo;
+  const elCountBomb = document.getElementById('countBomb');
+  if (elCountBomb) elCountBomb.textContent = 'x' + bombAmmo;
 
   const mobCountTrap = document.getElementById('mobileCountTrap');
   const mobCountMine = document.getElementById('mobileCountMine');
   const mobCountGun = document.getElementById('mobileCountGun');
+  const mobCountBomb = document.getElementById('mobileCountBomb');
   if (mobCountTrap) mobCountTrap.textContent = 'x' + trapCount;
   if (mobCountMine) mobCountMine.textContent = 'x' + mineCount;
   if (mobCountGun) mobCountGun.textContent = 'x' + gunAmmo;
+  if (mobCountBomb) mobCountBomb.textContent = 'x' + bombAmmo;
 
-  // In Solo mode: hide traps, mines, and gun slots completely!
+  // In Solo mode: hide traps, mines, and gun slots completely, but keep Bombs!
   if (elSlotTrap) elSlotTrap.classList.toggle('hidden', !isMultiplayer);
   if (elSlotMine) elSlotMine.classList.toggle('hidden', !isMultiplayer);
   const elSlotGun = document.getElementById('slotGun');
@@ -1276,14 +1302,16 @@ function spawnItem() {
   const rand = Math.random();
 
   if (!isMultiplayer) {
-    // "Khi chơi đơn không có khẩu súng" -> Chỉ có tim hồi máu và xu!
-    if (rand < 0.65) type = 'heart';
+    // "Khi chơi đơn không có khẩu súng" -> Có tim hồi máu, bom quăng và xu!
+    if (rand < 0.45) type = 'heart';
+    else if (rand < 0.75) type = 'bomb';
     else type = 'coin';
   } else {
-    // MULTIPLAYER: hearts, traps, mines, guns, coins
-    if (rand < 0.25) type = 'heart';
-    else if (rand < 0.45) type = 'trap';
-    else if (rand < 0.65) type = 'mine';
+    // MULTIPLAYER: hearts, bombs, traps, mines, guns, coins
+    if (rand < 0.22) type = 'heart';
+    else if (rand < 0.40) type = 'bomb';
+    else if (rand < 0.55) type = 'trap';
+    else if (rand < 0.70) type = 'mine';
     else if (rand < 0.85) type = 'gun';
     else type = 'coin';
   }
@@ -1363,6 +1391,12 @@ function collectItem(it) {
     spawnFloatingText('+1 ĐẠN', it.x, it.y, '#ffab40');
     spawnPickupParticles(it.x, it.y, '#ffab40');
     showToast(`Nhặt được súng! Đạn: ${gunAmmo} viên (Phím 3/F hoặc click để bắn)`);
+  } else if (it.type === 'bomb') {
+    bombAmmo = Math.min(6, bombAmmo + 1);
+    updateInventoryUI();
+    spawnFloatingText('+1 BOM 💣', it.x, it.y, '#f59e0b');
+    spawnPickupParticles(it.x, it.y, '#f59e0b');
+    showToast(`Nhặt được Bom! Có ${bombAmmo} quả (Phím Mũi tên ngắm, F quăng)`);
   } else if (it.type === 'coin') {
     const coinsEarned = 15;
     playerCoins += coinsEarned;
@@ -2361,6 +2395,187 @@ function updateBombs(dt) {
   }
 }
 
+// ══════════════════════════════════════════════
+//  BOMB THROWING SYSTEM (Quăng Bom)
+//  "nếu pc di chuyển nút a s d w còn khi điều khiển chỗ ném bom di chuyển nút mũi tên trái lên xuốn phải + bấm nút f để thả"
+// ══════════════════════════════════════════════
+
+function updateBombAim(dt) {
+  if (trapFrozenTimer > 0) return;
+  const aimSpeed = 9.5 * (dt / 1000); // 9.5 ô/giây lướt mượt mà
+
+  if (aimKeysDown.has('aim_up')) bombTarget.y -= aimSpeed;
+  if (aimKeysDown.has('aim_down')) bombTarget.y += aimSpeed;
+  if (aimKeysDown.has('aim_left')) bombTarget.x -= aimSpeed;
+  if (aimKeysDown.has('aim_right')) bombTarget.x += aimSpeed;
+
+  // Giới hạn cự ly quăng bom tối đa từ vị trí nhân vật (BOMB_THROW_MAX_RANGE = 7.5 ô)
+  const dx = bombTarget.x - player.x;
+  const dy = bombTarget.y - player.y;
+  const dist = Math.hypot(dx, dy);
+  if (dist > BOMB_THROW_MAX_RANGE) {
+    bombTarget.x = player.x + (dx / dist) * BOMB_THROW_MAX_RANGE;
+    bombTarget.y = player.y + (dy / dist) * BOMB_THROW_MAX_RANGE;
+  }
+
+  // Giới hạn trong sàn đấu
+  bombTarget.x = Math.max(0.6, Math.min(GRID - 1.6, bombTarget.x));
+  bombTarget.y = Math.max(0.6, Math.min(GRID - 1.6, bombTarget.y));
+}
+
+function throwBomb(customTargetX, customTargetY) {
+  if (!running || paused || trapFrozenTimer > 0) return;
+
+  if (bombCooldown > 0) {
+    showToast('Bom đang hồi chiêu...');
+    return;
+  }
+
+  if (bombAmmo <= 0) {
+    showToast('Hết bom rồi! Hãy tìm nhặt hộp bom 💣 trên bản đồ');
+    return;
+  }
+
+  bombAmmo--;
+  bombCooldown = BOMB_THROW_COOLDOWN;
+  updateInventoryUI();
+
+  const tx = customTargetX !== undefined ? customTargetX : bombTarget.x;
+  const ty = customTargetY !== undefined ? customTargetY : bombTarget.y;
+
+  const b = {
+    id: 'tb_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
+    ownerSlot: mySlot,
+    startX: player.x,
+    startY: player.y,
+    targetX: Math.max(0.6, Math.min(GRID - 1.6, tx)),
+    targetY: Math.max(0.6, Math.min(GRID - 1.6, ty)),
+    x: player.x,
+    y: player.y,
+    z: 0.6,
+    progress: 0,
+    duration: 650, // 650ms bay trên không trung
+    fuseTimer: 350, // 350ms ngòi nổ chớp đỏ trước khi phát nổ
+    state: 'flying',
+    rotation: 0
+  };
+
+  thrownBombs.push(b);
+  spawnFloatingText('QUĂNG BOM! 💣', player.x, player.y, '#f59e0b');
+  showCombatAlert('💣 Bạn đã quăng một quả bom hẹn giờ!', 'warning');
+
+  if (isMultiplayer) {
+    broadcastBombThrown(b);
+  }
+}
+window.throwBomb = throwBomb;
+
+function updateThrownBombs(dt) {
+  if (bombCooldown > 0) bombCooldown -= dt;
+
+  for (let i = thrownBombs.length - 1; i >= 0; i--) {
+    const b = thrownBombs[i];
+    if (b.state === 'flying') {
+      b.progress += dt / b.duration;
+      b.rotation += dt * 0.015;
+      if (b.progress >= 1) {
+        b.progress = 1;
+        b.x = b.targetX;
+        b.y = b.targetY;
+        b.z = 0.12;
+        b.state = 'ticking';
+        spawnPickupParticles(b.x, b.y, '#f59e0b');
+      } else {
+        const t = b.progress;
+        b.x = b.startX + (b.targetX - b.startX) * t;
+        b.y = b.startY + (b.targetY - b.startY) * t;
+        b.z = 4 * 3.5 * t * (1 - t) + 0.3; // Parabol cực đẹp
+      }
+    } else if (b.state === 'ticking') {
+      b.fuseTimer -= dt;
+      if (b.fuseTimer <= 0) {
+        explodeThrownBomb(b);
+        thrownBombs.splice(i, 1);
+      }
+    }
+  }
+}
+
+function explodeThrownBomb(b) {
+  triggerScreenShake(3.5, 240);
+  spawnPickupParticles(b.targetX, b.targetY, '#ff1744');
+  spawnFireSparks(b.targetX, b.targetY);
+
+  // Sóng xung kích 2D/3D
+  shockwaves.push({
+    x: b.targetX * CELL + CELL / 2,
+    y: b.targetY * CELL + CELL / 2,
+    radius: 8,
+    maxRadius: BOMB_BLAST_RADIUS * CELL,
+    life: 380,
+    maxLife: 380,
+    color: '#ff9100'
+  });
+
+  // Gây sát thương nổ bom: 65 - 75 HP!
+  if (!isSpectator) {
+    const distToPlayer = Math.hypot(player.x - b.targetX, player.y - b.targetY);
+    if (distToPlayer <= BOMB_BLAST_RADIUS) {
+      const dmg = 65 + Math.floor(Math.random() * 11);
+      takeDamage(dmg, 'Bị bom quăng nổ tung!');
+      spawnFloatingText(`-${dmg} HP BOM!`, player.x, player.y, '#ff1744');
+      showCombatAlert(`💥 Bị trúng bom nổ tung -${dmg} HP!`, 'danger');
+
+      // Đẩy văng người chơi ra ngoài tâm vụ nổ
+      const angle = Math.atan2(player.y - b.targetY, player.x - b.targetX);
+      player.x = Math.max(0.6, Math.min(GRID - 1.6, player.x + Math.cos(angle) * 1.5));
+      player.y = Math.max(0.6, Math.min(GRID - 1.6, player.y + Math.sin(angle) * 1.5));
+    }
+  }
+
+  // Phá hủy bẫy kẹp và mìn trong tầm nổ
+  placedTraps = placedTraps.filter(t => Math.hypot(t.x - b.targetX, t.y - b.targetY) > BOMB_BLAST_RADIUS);
+  placedMines = placedMines.filter(m => Math.hypot(m.x - b.targetX, m.y - b.targetY) > BOMB_BLAST_RADIUS);
+
+  // Vết cháy xém
+  burntGrass.set(`${Math.round(b.targetX)},${Math.round(b.targetY)}`, 9000);
+
+  if (isMultiplayer) {
+    broadcastBombExploded(b);
+  }
+}
+
+function broadcastBombThrown(b) {
+  broadcastNetworkMessage({
+    type: 'BOMB_THROWN',
+    ownerSlot: mySlot,
+    bomb: {
+      id: b.id,
+      ownerSlot: b.ownerSlot,
+      startX: b.startX,
+      startY: b.startY,
+      targetX: b.targetX,
+      targetY: b.targetY,
+      duration: b.duration,
+      progress: 0,
+      state: 'flying',
+      fuseTimer: b.fuseTimer,
+      x: b.startX,
+      y: b.startY,
+      z: 0.6
+    }
+  });
+}
+
+function broadcastBombExploded(b) {
+  broadcastNetworkMessage({
+    type: 'BOMB_EXPLODED',
+    bombId: b.id,
+    targetX: b.targetX,
+    targetY: b.targetY
+  });
+}
+
 // ── Warning Banners ───────
 function updateWarningBanners() {
   const warnings = [];
@@ -2404,8 +2619,8 @@ function loop(now) {
   const dt = Math.min(now - lastTime, 40);
   lastTime = now;
 
-  if (!running || paused) { draw(); return; }
-  if (isCountingDown) { draw(); return; }
+  if (!running || paused) { draw(); if (typeof render3D === 'function') render3D(16); return; }
+  if (isCountingDown) { draw(); if (typeof render3D === 'function') render3D(16); return; }
 
   if (damageCooldown > 0) damageCooldown -= dt;
   if (trapFrozenTimer > 0) trapFrozenTimer -= dt;
@@ -2447,6 +2662,8 @@ function loop(now) {
 
   updateItems(dt);
   updateBullets(dt);
+  updateBombAim(dt);
+  updateThrownBombs(dt);
 
   updateFireWave(dt);
   updateThunderstorm(dt);
@@ -2472,6 +2689,7 @@ function loop(now) {
   }
 
   draw();
+  if (typeof render3D === 'function') render3D(dt);
 }
 
 // ── Smooth Continuous Movement (Non-Grid) ──────
@@ -3336,6 +3554,38 @@ function drawItems() {
       ctx.fillStyle = '#00e5ff';
       ctx.fillRect(x - 2, y + bounce - 1, 4, 2);
 
+    } else if (it.type === 'bomb') {
+      // Golden Amber Throwable Bomb Pickup
+      ctx.shadowColor = 'rgba(245, 158, 11, 0.95)';
+      ctx.shadowBlur = 16;
+
+      ctx.fillStyle = 'rgba(245, 158, 11, 0.25)';
+      ctx.beginPath();
+      ctx.arc(x, y + bounce, 10, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#1e293b';
+      ctx.beginPath();
+      ctx.arc(x, y + bounce + 1, 7, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.strokeStyle = '#f59e0b';
+      ctx.lineWidth = 1.8;
+      ctx.stroke();
+
+      // Spark fuse
+      ctx.strokeStyle = '#fbbf24';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(x, y + bounce - 6);
+      ctx.lineTo(x + 3, y + bounce - 9);
+      ctx.stroke();
+
+      ctx.fillStyle = '#ef4444';
+      ctx.beginPath();
+      ctx.arc(x + 3.5, y + bounce - 9.5, 2, 0, Math.PI * 2);
+      ctx.fill();
+
     } else if (it.type === 'coin') {
       // Holographic Energy Coin
       ctx.shadowColor = 'rgba(255, 215, 0, 0.95)';
@@ -4061,19 +4311,943 @@ function drawPauseOverlay() {
   ctx.textAlign = 'start';
 }
 
+// ══════════════════════════════════════════════
+//  THREE.JS 3D ENGINE (Chuyển Hóa Game 2D Thành 3D)
+// ══════════════════════════════════════════════
+
+let scene3D = null;
+let camera3D = null;
+let renderer3D = null;
+let is3DReady = false;
+
+let ambientLight3D, dirLight3D, rimLight3D;
+let pointLightFire3D, pointLightLightning3D, pointLightBomb3D;
+
+let tileMeshes3D = [];
+let matTileNormal3D, matTileScorched3D, matTileWater3D, matTileElectric3D, matTileSinkhole3D;
+
+let localSurvivor3D = null;
+const remoteSurvivors3D = new Map();
+
+let reticle3D = null;
+let trajectoryLine3D = null;
+
+const thrownBombMeshes3D = new Map();
+const itemMeshes3D = new Map();
+const trapMeshes3D = new Map();
+const mineMeshes3D = new Map();
+const bulletMeshes3D = new Map();
+
+let lavaWallGroup3D = null;
+let rainParticles3D = null;
+let lightningBolt3D = null;
+const tornadoGroups3D = [];
+
+function getSkinHex(skinId) {
+  if (!skinId || skinId === 'default') return 0x00e5ff;
+  if (skinId === 'cyber_red') return 0xff1744;
+  if (skinId === 'toxic_green') return 0x00e676;
+  if (skinId === 'gold_titan') return 0xffd700;
+  if (skinId === 'void_purple') return 0x7c4dff;
+  if (skinId === 'neon_pink') return 0xff007f;
+  if (skinId === 'inferno_orange') return 0xff9100;
+  if (skinId === 'frost_cyan') return 0x38bdf8;
+  return 0x00e5ff;
+}
+
+function init3DScene() {
+  if (typeof THREE === 'undefined') {
+    console.warn('Three.js library is not loaded');
+    return;
+  }
+  const webglCanvas = document.getElementById('webglCanvas');
+  if (!webglCanvas) return;
+
+  scene3D = new THREE.Scene();
+  scene3D.background = new THREE.Color(0x060913);
+  scene3D.fog = new THREE.FogExp2(0x060913, 0.02);
+
+  camera3D = new THREE.PerspectiveCamera(46, 1, 0.1, 1000);
+  camera3D.position.set(GRID / 2, 19.5, GRID / 2 + 14.8);
+  camera3D.lookAt(GRID / 2, 0, GRID / 2 - 0.2);
+
+  renderer3D = new THREE.WebGLRenderer({
+    canvas: webglCanvas,
+    antialias: true,
+    alpha: false,
+    powerPreference: 'high-performance'
+  });
+  renderer3D.setSize(CANVAS_PX, CANVAS_PX);
+  renderer3D.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer3D.shadowMap.enabled = true;
+  renderer3D.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer3D.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer3D.toneMappingExposure = 1.15;
+
+  // Lights
+  ambientLight3D = new THREE.AmbientLight(0x334155, 0.85);
+  scene3D.add(ambientLight3D);
+
+  dirLight3D = new THREE.DirectionalLight(0xfff7ed, 1.35);
+  dirLight3D.position.set(16, 26, 22);
+  dirLight3D.castShadow = true;
+  dirLight3D.shadow.mapSize.set(1024, 1024);
+  dirLight3D.shadow.camera.near = 0.5;
+  dirLight3D.shadow.camera.far = 60;
+  dirLight3D.shadow.camera.left = -16;
+  dirLight3D.shadow.camera.right = 16;
+  dirLight3D.shadow.camera.top = 16;
+  dirLight3D.shadow.camera.bottom = -16;
+  scene3D.add(dirLight3D);
+
+  rimLight3D = new THREE.DirectionalLight(0x00e5ff, 0.5);
+  rimLight3D.position.set(-14, 12, -14);
+  scene3D.add(rimLight3D);
+
+  pointLightFire3D = new THREE.PointLight(0xff4500, 0, 24);
+  pointLightFire3D.position.set(GRID / 2, 2, GRID / 2);
+  scene3D.add(pointLightFire3D);
+
+  pointLightLightning3D = new THREE.PointLight(0x00f0ff, 0, 36);
+  pointLightLightning3D.position.set(GRID / 2, 5, GRID / 2);
+  scene3D.add(pointLightLightning3D);
+
+  pointLightBomb3D = new THREE.PointLight(0xfbbf24, 0, 24);
+  pointLightBomb3D.position.set(GRID / 2, 1.5, GRID / 2);
+  scene3D.add(pointLightBomb3D);
+
+  // Floating Cyber Arena Base
+  const baseGeo = new THREE.BoxGeometry(GRID + 1.6, 1.2, GRID + 1.6);
+  const baseMat = new THREE.MeshStandardMaterial({ color: 0x090d16, roughness: 0.85, metalness: 0.4 });
+  const baseMesh = new THREE.Mesh(baseGeo, baseMat);
+  baseMesh.position.set(GRID / 2, -0.65, GRID / 2);
+  baseMesh.receiveShadow = true;
+  scene3D.add(baseMesh);
+
+  // Glowing Neon Trim
+  const borderMat = new THREE.MeshBasicMaterial({ color: 0x00e5ff });
+  const b1 = new THREE.Mesh(new THREE.BoxGeometry(GRID + 0.1, 0.06, 0.12), borderMat);
+  b1.position.set(GRID / 2, 0.02, 0);
+  scene3D.add(b1);
+  const b2 = new THREE.Mesh(new THREE.BoxGeometry(GRID + 0.1, 0.06, 0.12), borderMat);
+  b2.position.set(GRID / 2, 0.02, GRID);
+  scene3D.add(b2);
+  const b3 = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.06, GRID + 0.1), borderMat);
+  b3.position.set(0, 0.02, GRID / 2);
+  scene3D.add(b3);
+  const b4 = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.06, GRID + 0.1), borderMat);
+  b4.position.set(GRID, 0.02, GRID / 2);
+  scene3D.add(b4);
+
+  // 20x20 Tiles
+  matTileNormal3D = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.6, metalness: 0.35 });
+  matTileScorched3D = new THREE.MeshStandardMaterial({ color: 0x18181b, emissive: 0xea580c, emissiveIntensity: 0.85, roughness: 0.8 });
+  matTileWater3D = new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.1, metalness: 0.7, transparent: true, opacity: 0.85 });
+  matTileElectric3D = new THREE.MeshStandardMaterial({ color: 0x00e5ff, emissive: 0x00e5ff, emissiveIntensity: 1.1 });
+  matTileSinkhole3D = new THREE.MeshStandardMaterial({ color: 0x3e2723, roughness: 0.95 });
+
+  const tileGeo = new THREE.BoxGeometry(0.94, 0.18, 0.94);
+  tileMeshes3D = [];
+  for (let x = 0; x < GRID; x++) {
+    tileMeshes3D[x] = [];
+    for (let z = 0; z < GRID; z++) {
+      const tile = new THREE.Mesh(tileGeo, matTileNormal3D);
+      tile.position.set(x + 0.5, -0.09, z + 0.5);
+      tile.receiveShadow = true;
+      scene3D.add(tile);
+      tileMeshes3D[x][z] = tile;
+    }
+  }
+
+  // Survivor 3D (Local Player)
+  localSurvivor3D = buildSurvivor3D(equippedSkinId || 'default', 'Bạn', true);
+  scene3D.add(localSurvivor3D.root);
+
+  // Bomb Reticle 3D & Trajectory
+  reticle3D = buildReticle3D();
+  scene3D.add(reticle3D);
+
+  // Disasters
+  lavaWallGroup3D = buildLavaWall3D();
+  scene3D.add(lavaWallGroup3D);
+
+  rainParticles3D = buildRain3D();
+  scene3D.add(rainParticles3D);
+
+  lightningBolt3D = buildLightningBolt3D();
+  scene3D.add(lightningBolt3D.group);
+
+  for (let i = 0; i < 3; i++) {
+    const tg = buildTornado3D();
+    tg.visible = false;
+    scene3D.add(tg);
+    tornadoGroups3D.push(tg);
+  }
+
+  init3DPointerControls();
+  window.addEventListener('resize', resize3D);
+  is3DReady = true;
+}
+
+function resize3D() {
+  if (!renderer3D || !camera3D) return;
+  const webglCanvas = document.getElementById('webglCanvas');
+  if (!webglCanvas) return;
+  const rect = webglCanvas.getBoundingClientRect();
+  const w = rect.width || CANVAS_PX;
+  const h = rect.height || CANVAS_PX;
+  camera3D.aspect = w / h;
+  camera3D.updateProjectionMatrix();
+  renderer3D.setSize(w, h, false);
+}
+
+function buildSurvivor3D(skinId, name, isLocal) {
+  const root = new THREE.Group();
+  const primaryHex = getSkinHex(skinId);
+
+  const bodyGroup = new THREE.Group();
+
+  // Torso
+  const torsoGeo = new THREE.BoxGeometry(0.5, 0.54, 0.36);
+  const torsoMat = new THREE.MeshStandardMaterial({
+    color: primaryHex,
+    metalness: 0.65,
+    roughness: 0.32,
+  });
+  const torso = new THREE.Mesh(torsoGeo, torsoMat);
+  torso.position.y = 0.48;
+  torso.castShadow = true;
+  bodyGroup.add(torso);
+
+  // Glowing Chest Reactor
+  const coreGeo = new THREE.CylinderGeometry(0.08, 0.08, 0.04, 16);
+  coreGeo.rotateX(Math.PI / 2);
+  const coreMat = new THREE.MeshBasicMaterial({ color: 0x00f0ff });
+  const core = new THREE.Mesh(coreGeo, coreMat);
+  core.position.set(0, 0.5, 0.19);
+  bodyGroup.add(core);
+
+  // Head / Helmet
+  const headGeo = new THREE.SphereGeometry(0.22, 16, 14);
+  const headMat = new THREE.MeshStandardMaterial({
+    color: 0x1e293b,
+    metalness: 0.8,
+    roughness: 0.25,
+  });
+  const head = new THREE.Mesh(headGeo, headMat);
+  head.position.y = 0.88;
+  head.castShadow = true;
+  bodyGroup.add(head);
+
+  // Visor
+  const visorGeo = new THREE.CylinderGeometry(0.21, 0.21, 0.1, 16, 1, false, 0, Math.PI);
+  const visorMat = new THREE.MeshBasicMaterial({ color: primaryHex });
+  const visor = new THREE.Mesh(visorGeo, visorMat);
+  visor.position.set(0, 0.88, 0.04);
+  bodyGroup.add(visor);
+
+  // Jetpack
+  const packGeo = new THREE.BoxGeometry(0.3, 0.35, 0.12);
+  const packMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.7, roughness: 0.3 });
+  const pack = new THREE.Mesh(packGeo, packMat);
+  pack.position.set(0, 0.5, -0.22);
+  bodyGroup.add(pack);
+
+  // Arms
+  const armGeo = new THREE.CylinderGeometry(0.075, 0.07, 0.4, 8);
+  const armMat = new THREE.MeshStandardMaterial({ color: primaryHex, metalness: 0.5, roughness: 0.4 });
+
+  const leftArmPivot = new THREE.Group();
+  leftArmPivot.position.set(-0.32, 0.65, 0);
+  const leftArm = new THREE.Mesh(armGeo, armMat);
+  leftArm.position.y = -0.2;
+  leftArm.castShadow = true;
+  leftArmPivot.add(leftArm);
+  bodyGroup.add(leftArmPivot);
+
+  const rightArmPivot = new THREE.Group();
+  rightArmPivot.position.set(0.32, 0.65, 0);
+  const rightArm = new THREE.Mesh(armGeo, armMat);
+  rightArm.position.y = -0.2;
+  rightArm.castShadow = true;
+  rightArmPivot.add(rightArm);
+  bodyGroup.add(rightArmPivot);
+
+  // Legs
+  const legGeo = new THREE.CylinderGeometry(0.09, 0.08, 0.42, 8);
+  const legMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.4, roughness: 0.6 });
+
+  const leftLegPivot = new THREE.Group();
+  leftLegPivot.position.set(-0.15, 0.22, 0);
+  const leftLeg = new THREE.Mesh(legGeo, legMat);
+  leftLeg.position.y = -0.21;
+  leftLeg.castShadow = true;
+  leftLegPivot.add(leftLeg);
+  bodyGroup.add(leftLegPivot);
+
+  const rightLegPivot = new THREE.Group();
+  rightLegPivot.position.set(0.15, 0.22, 0);
+  const rightLeg = new THREE.Mesh(legGeo, legMat);
+  rightLeg.position.y = -0.21;
+  rightLeg.castShadow = true;
+  rightLegPivot.add(rightLeg);
+  bodyGroup.add(rightLegPivot);
+
+  root.add(bodyGroup);
+
+  // Ice Block (when caught in bear trap)
+  const iceGeo = new THREE.BoxGeometry(0.9, 1.25, 0.9);
+  const iceMat = new THREE.MeshStandardMaterial({
+    color: 0x67e8f9,
+    roughness: 0.1,
+    metalness: 0.1,
+    transparent: true,
+    opacity: 0.6,
+    depthWrite: false
+  });
+  const iceMesh = new THREE.Mesh(iceGeo, iceMat);
+  iceMesh.position.y = 0.55;
+  iceMesh.visible = false;
+  root.add(iceMesh);
+
+  // Overhead 3D Health Bar
+  const hpBgGeo = new THREE.BoxGeometry(0.9, 0.08, 0.02);
+  const hpBgMat = new THREE.MeshBasicMaterial({ color: 0x330000 });
+  const hpBg = new THREE.Mesh(hpBgGeo, hpBgMat);
+  hpBg.position.y = 1.25;
+
+  const hpFillGeo = new THREE.BoxGeometry(0.88, 0.07, 0.025);
+  const hpFillMat = new THREE.MeshBasicMaterial({ color: 0x00e676 });
+  const hpFill = new THREE.Mesh(hpFillGeo, hpFillMat);
+  hpFill.position.set(0, 0, 0.005);
+  hpBg.add(hpFill);
+  root.add(hpBg);
+
+  // Overhead Name Sprite
+  const nameCanvas = document.createElement('canvas');
+  nameCanvas.width = 128;
+  nameCanvas.height = 36;
+  const nctx = nameCanvas.getContext('2d');
+  nctx.fillStyle = 'rgba(10, 16, 30, 0.75)';
+  nctx.roundRect(4, 4, 120, 28, 8);
+  nctx.fill();
+  nctx.strokeStyle = isLocal ? '#00e5ff' : '#f59e0b';
+  nctx.lineWidth = 1.5;
+  nctx.stroke();
+  nctx.fillStyle = '#ffffff';
+  nctx.font = 'bold 16px Inter, sans-serif';
+  nctx.textAlign = 'center';
+  nctx.textBaseline = 'middle';
+  nctx.fillText(name || (isLocal ? 'Bạn' : 'Người chơi'), 64, 18);
+
+  const nameTex = new THREE.CanvasTexture(nameCanvas);
+  const nameSpriteMat = new THREE.SpriteMaterial({ map: nameTex, transparent: true });
+  const nameSprite = new THREE.Sprite(nameSpriteMat);
+  nameSprite.position.set(0, 1.48, 0);
+  nameSprite.scale.set(1.4, 0.4, 1);
+  root.add(nameSprite);
+
+  return {
+    root,
+    bodyGroup,
+    torso,
+    torsoMat,
+    leftArmPivot,
+    rightArmPivot,
+    leftLegPivot,
+    rightLegPivot,
+    iceMesh,
+    hpBg,
+    hpFill,
+    hpFillMat,
+    nameSprite,
+    walkPhase: 0
+  };
+}
+
+function buildReticle3D() {
+  const group = new THREE.Group();
+  const ringGeo = new THREE.RingGeometry(BOMB_BLAST_RADIUS - 0.07, BOMB_BLAST_RADIUS, 36);
+  ringGeo.rotateX(-Math.PI / 2);
+  const ringMat = new THREE.MeshBasicMaterial({ color: 0xf59e0b, side: THREE.DoubleSide, transparent: true, opacity: 0.75 });
+  const ringMesh = new THREE.Mesh(ringGeo, ringMat);
+  group.add(ringMesh);
+
+  const innerGeo = new THREE.RingGeometry(0.3, 0.38, 24);
+  innerGeo.rotateX(-Math.PI / 2);
+  const innerMesh = new THREE.Mesh(innerGeo, ringMat);
+  group.add(innerMesh);
+
+  const lineMat = new THREE.LineBasicMaterial({ color: 0xf59e0b, transparent: true, opacity: 0.85 });
+  const crossPoints = [
+    new THREE.Vector3(-BOMB_BLAST_RADIUS, 0, 0), new THREE.Vector3(BOMB_BLAST_RADIUS, 0, 0),
+    new THREE.Vector3(0, 0, -BOMB_BLAST_RADIUS), new THREE.Vector3(0, 0, BOMB_BLAST_RADIUS)
+  ];
+  const crossGeo = new THREE.BufferGeometry().setFromPoints(crossPoints);
+  const crossMesh = new THREE.LineSegments(crossGeo, lineMat);
+  group.add(crossMesh);
+
+  group.position.y = 0.04;
+  return group;
+}
+
+function updateTrajectory3D() {
+  if (!trajectoryLine3D) {
+    const lineMat = new THREE.LineDashedMaterial({
+      color: 0xfbbf24,
+      dashSize: 0.3,
+      gapSize: 0.15,
+      transparent: true,
+      opacity: 0.85
+    });
+    const geo = new THREE.BufferGeometry();
+    trajectoryLine3D = new THREE.Line(geo, lineMat);
+    scene3D.add(trajectoryLine3D);
+  }
+
+  const start = new THREE.Vector3(player.x, 0.6, player.y);
+  const end = new THREE.Vector3(bombTarget.x, 0.05, bombTarget.y);
+  const mid = new THREE.Vector3(
+    (player.x + bombTarget.x) / 2,
+    3.2,
+    (player.y + bombTarget.y) / 2
+  );
+
+  const curve = new THREE.QuadraticBezierCurve3(start, mid, end);
+  const points = curve.getPoints(24);
+  trajectoryLine3D.geometry.setFromPoints(points);
+  trajectoryLine3D.computeLineDistances();
+  trajectoryLine3D.visible = running && !paused && bombAmmo > 0;
+}
+
+function buildRain3D() {
+  const rainCount = 800;
+  const rainGeo = new THREE.BufferGeometry();
+  const positions = new Float32Array(rainCount * 3);
+  for (let i = 0; i < rainCount; i++) {
+    positions[i * 3]     = Math.random() * (GRID + 8) - 4;
+    positions[i * 3 + 1] = Math.random() * 22;
+    positions[i * 3 + 2] = Math.random() * (GRID + 8) - 4;
+  }
+  rainGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  const rainMat = new THREE.PointsMaterial({
+    color: 0x38bdf8,
+    size: 0.15,
+    transparent: true,
+    opacity: 0.65
+  });
+  const rain = new THREE.Points(rainGeo, rainMat);
+  rain.visible = false;
+  return rain;
+}
+
+function buildLightningBolt3D() {
+  const group = new THREE.Group();
+  const lineMat = new THREE.LineBasicMaterial({ color: 0x00f0ff });
+  const boltGeo = new THREE.BufferGeometry();
+  const line = new THREE.Line(boltGeo, lineMat);
+  group.add(line);
+
+  const coreMat = new THREE.LineBasicMaterial({ color: 0xffffff });
+  const coreLine = new THREE.Line(boltGeo, coreMat);
+  group.add(coreLine);
+
+  group.visible = false;
+  return { group, line, coreLine, boltGeo };
+}
+
+function buildTornado3D() {
+  const group = new THREE.Group();
+  const ringLevels = [
+    { y: 0.3, r: 0.45, count: 40, size: 0.14 },
+    { y: 1.5, r: 1.0, count: 60, size: 0.18 },
+    { y: 3.2, r: 1.6, count: 80, size: 0.22 },
+    { y: 5.0, r: 2.3, count: 100, size: 0.26 }
+  ];
+
+  for (const lvl of ringLevels) {
+    const geo = new THREE.BufferGeometry();
+    const pos = new Float32Array(lvl.count * 3);
+    for (let i = 0; i < lvl.count; i++) {
+      const ang = (i / lvl.count) * Math.PI * 2;
+      const rad = lvl.r * (0.85 + Math.random() * 0.3);
+      pos[i * 3]     = Math.cos(ang) * rad;
+      pos[i * 3 + 1] = lvl.y + (Math.random() - 0.5) * 0.4;
+      pos[i * 3 + 2] = Math.sin(ang) * rad;
+    }
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    const mat = new THREE.PointsMaterial({
+      color: 0x94a3b8,
+      size: lvl.size,
+      transparent: true,
+      opacity: 0.75
+    });
+    const p = new THREE.Points(geo, mat);
+    p.userData = { speed: (Math.random() > 0.5 ? 1 : -1) * (0.03 + Math.random() * 0.02) };
+    group.add(p);
+  }
+
+  const debrisGeo = new THREE.BoxGeometry(0.18, 0.18, 0.18);
+  const debrisMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.9 });
+  for (let i = 0; i < 6; i++) {
+    const m = new THREE.Mesh(debrisGeo, debrisMat);
+    m.position.set((Math.random() - 0.5) * 2, 1 + Math.random() * 3, (Math.random() - 0.5) * 2);
+    m.userData = { orbitSpeed: 0.04 + Math.random() * 0.03, orbitDist: 0.8 + Math.random() * 1.2, orbitAngle: Math.random() * Math.PI * 2 };
+    group.add(m);
+  }
+
+  return group;
+}
+
+function buildLavaWall3D() {
+  const group = new THREE.Group();
+  const count = 18;
+  const coneGeo = new THREE.ConeGeometry(0.42, 1.4, 6);
+  const lavaMat = new THREE.MeshStandardMaterial({
+    color: 0xff3d00,
+    emissive: 0xff5722,
+    emissiveIntensity: 1.1,
+    roughness: 0.7
+  });
+
+  for (let i = 0; i < count; i++) {
+    const rock = new THREE.Mesh(coneGeo, lavaMat);
+    rock.position.set(0, 0.7, (i / (count - 1) - 0.5) * GRID);
+    rock.rotation.y = Math.random() * Math.PI * 2;
+    rock.rotation.z = (Math.random() - 0.5) * 0.3;
+    group.add(rock);
+  }
+
+  group.visible = false;
+  return group;
+}
+
+function createThrownBombMesh3D() {
+  const group = new THREE.Group();
+  const sphereGeo = new THREE.SphereGeometry(0.32, 16, 14);
+  const sphereMat = new THREE.MeshStandardMaterial({
+    color: 0x1e293b,
+    metalness: 0.8,
+    roughness: 0.28
+  });
+  const sphere = new THREE.Mesh(sphereGeo, sphereMat);
+  sphere.castShadow = true;
+  group.add(sphere);
+
+  const bandGeo = new THREE.CylinderGeometry(0.33, 0.33, 0.09, 16);
+  const bandMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.4 });
+  const band = new THREE.Mesh(bandGeo, bandMat);
+  group.add(band);
+
+  const fuseGeo = new THREE.CylinderGeometry(0.04, 0.04, 0.16, 8);
+  const fuseMat = new THREE.MeshStandardMaterial({ color: 0x78716c });
+  const fuse = new THREE.Mesh(fuseGeo, fuseMat);
+  fuse.position.y = 0.34;
+  group.add(fuse);
+
+  const sparkGeo = new THREE.SphereGeometry(0.06, 8, 8);
+  const sparkMat = new THREE.MeshBasicMaterial({ color: 0xef4444 });
+  const spark = new THREE.Mesh(sparkGeo, sparkMat);
+  spark.position.y = 0.42;
+  group.add(spark);
+
+  return { group, sphere, sparkMat };
+}
+
+function createItemMesh3D(type) {
+  const group = new THREE.Group();
+
+  if (type === 'heart') {
+    const crateGeo = new THREE.BoxGeometry(0.46, 0.46, 0.46);
+    const crateMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.3, metalness: 0.2 });
+    const crate = new THREE.Mesh(crateGeo, crateMat);
+    crate.castShadow = true;
+    group.add(crate);
+
+    const crossMat = new THREE.MeshBasicMaterial({ color: 0xef4444 });
+    const c1 = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.34, 0.48), crossMat);
+    const c2 = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.12, 0.48), crossMat);
+    group.add(c1);
+    group.add(c2);
+  } else if (type === 'bomb') {
+    const crateGeo = new THREE.BoxGeometry(0.48, 0.48, 0.48);
+    const crateMat = new THREE.MeshStandardMaterial({ color: 0xd97706, metalness: 0.6, roughness: 0.3 });
+    const crate = new THREE.Mesh(crateGeo, crateMat);
+    crate.castShadow = true;
+    group.add(crate);
+
+    const bombTipGeo = new THREE.SphereGeometry(0.16, 12, 10);
+    const bombTipMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.9, roughness: 0.2 });
+    const bombTip = new THREE.Mesh(bombTipGeo, bombTipMat);
+    bombTip.position.y = 0.28;
+    group.add(bombTip);
+  } else if (type === 'trap') {
+    const trapGeo = new THREE.CylinderGeometry(0.3, 0.32, 0.1, 12);
+    const trapMat = new THREE.MeshStandardMaterial({ color: 0xeab308, metalness: 0.8, roughness: 0.3 });
+    const m = new THREE.Mesh(trapGeo, trapMat);
+    group.add(m);
+  } else if (type === 'mine') {
+    const mineGeo = new THREE.CylinderGeometry(0.32, 0.34, 0.08, 16);
+    const mineMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.7, roughness: 0.3 });
+    const m = new THREE.Mesh(mineGeo, mineMat);
+    group.add(m);
+
+    const ledGeo = new THREE.SphereGeometry(0.08, 8, 8);
+    const ledMat = new THREE.MeshBasicMaterial({ color: 0xef4444 });
+    const led = new THREE.Mesh(ledGeo, ledMat);
+    led.position.y = 0.06;
+    group.add(led);
+  } else if (type === 'gun') {
+    const chassisGeo = new THREE.BoxGeometry(0.5, 0.2, 0.18);
+    const chassisMat = new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.8, roughness: 0.3 });
+    const chassis = new THREE.Mesh(chassisGeo, chassisMat);
+    group.add(chassis);
+
+    const cellGeo = new THREE.CylinderGeometry(0.08, 0.08, 0.24, 8);
+    cellGeo.rotateZ(Math.PI / 2);
+    const cellMat = new THREE.MeshBasicMaterial({ color: 0x00e5ff });
+    const cell = new THREE.Mesh(cellGeo, cellMat);
+    cell.position.y = 0.14;
+    group.add(cell);
+  } else {
+    // Coin
+    const coinGeo = new THREE.CylinderGeometry(0.25, 0.25, 0.06, 16);
+    const coinMat = new THREE.MeshStandardMaterial({ color: 0xffd700, metalness: 0.9, roughness: 0.2 });
+    const coin = new THREE.Mesh(coinGeo, coinMat);
+    coin.rotation.x = Math.PI / 4;
+    group.add(coin);
+  }
+
+  group.position.y = 0.45;
+  return group;
+}
+
+function init3DPointerControls() {
+  const webglCanvas = document.getElementById('webglCanvas');
+  if (!webglCanvas) return;
+
+  function handlePointer(clientX, clientY) {
+    if (!running || paused || isSpectator || !camera3D) return;
+    const rect = webglCanvas.getBoundingClientRect();
+    const ndcX = ((clientX - rect.left) / rect.width) * 2 - 1;
+    const ndcY = -(((clientY - rect.top) / rect.height) * 2 - 1);
+
+    const raycaster = new THREE.Raycaster();
+    raycaster.setFromCamera(new THREE.Vector2(ndcX, ndcY), camera3D);
+
+    const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+    const hit = new THREE.Vector3();
+    if (raycaster.ray.intersectPlane(plane, hit)) {
+      const dx = hit.x - player.x;
+      const dy = hit.z - player.y;
+      const dist = Math.hypot(dx, dy);
+
+      if (dist <= BOMB_THROW_MAX_RANGE) {
+        bombTarget.x = Math.max(0.6, Math.min(GRID - 1.6, hit.x));
+        bombTarget.y = Math.max(0.6, Math.min(GRID - 1.6, hit.z));
+      } else {
+        bombTarget.x = Math.max(0.6, Math.min(GRID - 1.6, player.x + (dx / dist) * BOMB_THROW_MAX_RANGE));
+        bombTarget.y = Math.max(0.6, Math.min(GRID - 1.6, player.y + (dy / dist) * BOMB_THROW_MAX_RANGE));
+      }
+    }
+  }
+
+  webglCanvas.addEventListener('pointermove', e => {
+    if (e.buttons > 0) handlePointer(e.clientX, e.clientY);
+  });
+
+  webglCanvas.addEventListener('pointerdown', e => {
+    handlePointer(e.clientX, e.clientY);
+  });
+}
+
+function render3D(dt) {
+  if (!is3DReady || !renderer3D || !scene3D || !camera3D) return;
+
+  // 1. Camera Shake
+  if (camShakeTimer > 0) {
+    const shake = (camShakeTimer / 250) * camShakeIntensity * 0.12;
+    camera3D.position.x = 10 + (Math.random() - 0.5) * shake;
+    camera3D.position.y = 19.5 + (Math.random() - 0.5) * shake;
+    camera3D.position.z = 24.8 + (Math.random() - 0.5) * shake;
+  } else {
+    camera3D.position.set(10, 19.5, 24.8);
+  }
+  camera3D.lookAt(10, 0, 9.8);
+
+  // 2. Update Tiles (20x20)
+  for (let x = 0; x < GRID; x++) {
+    for (let z = 0; z < GRID; z++) {
+      const tile = tileMeshes3D[x][z];
+      const key = `${x},${z}`;
+
+      if (sinkholeCells.has(key)) {
+        tile.material = matTileSinkhole3D;
+        tile.position.y = THREE.MathUtils.lerp(tile.position.y, -0.55, 0.18);
+        tile.rotation.x = 0.08;
+      } else {
+        tile.position.y = THREE.MathUtils.lerp(tile.position.y, -0.09, 0.18);
+        tile.rotation.x = 0;
+
+        if (electrifiedPuddles.has(key)) {
+          tile.material = matTileElectric3D;
+        } else if (puddleCells.has(key)) {
+          tile.material = matTileWater3D;
+        } else if (fireCells.has(key) || burntGrass.has(key) || spreadingFlames.has(key)) {
+          tile.material = matTileScorched3D;
+        } else {
+          tile.material = matTileNormal3D;
+        }
+      }
+    }
+  }
+
+  // 3. Update Local Survivor
+  if (localSurvivor3D) {
+    localSurvivor3D.root.position.set(player.x, 0, player.y);
+    localSurvivor3D.root.rotation.y = -player.angle + Math.PI / 2;
+
+    const isMoving = keysDown.size > 0 || dir.x !== 0 || dir.y !== 0;
+    localSurvivor3D.bodyGroup.rotation.x = isMoving ? 0.14 : 0;
+
+    if (isMoving) {
+      localSurvivor3D.walkPhase += dt * 0.015;
+      localSurvivor3D.leftLegPivot.rotation.x = Math.sin(localSurvivor3D.walkPhase) * 0.6;
+      localSurvivor3D.rightLegPivot.rotation.x = -Math.sin(localSurvivor3D.walkPhase) * 0.6;
+      localSurvivor3D.leftArmPivot.rotation.x = -Math.sin(localSurvivor3D.walkPhase) * 0.5;
+      localSurvivor3D.rightArmPivot.rotation.x = Math.sin(localSurvivor3D.walkPhase) * 0.5;
+      localSurvivor3D.bodyGroup.position.y = Math.abs(Math.sin(localSurvivor3D.walkPhase * 2)) * 0.06;
+    } else {
+      localSurvivor3D.leftLegPivot.rotation.x = 0;
+      localSurvivor3D.rightLegPivot.rotation.x = 0;
+      localSurvivor3D.leftArmPivot.rotation.x = 0;
+      localSurvivor3D.rightArmPivot.rotation.x = 0;
+      localSurvivor3D.bodyGroup.position.y = Math.sin(performance.now() * 0.003) * 0.02;
+    }
+
+    if (damageCooldown > 1200 || playerHurtFlash > 0) {
+      localSurvivor3D.torsoMat.emissive.setHex(0xff1744);
+    } else {
+      localSurvivor3D.torsoMat.emissive.setHex(0x000000);
+    }
+
+    localSurvivor3D.iceMesh.visible = trapFrozenTimer > 0;
+
+    const hpRatio = Math.max(0, Math.min(1, hp / MAX_HP));
+    localSurvivor3D.hpFill.scale.x = hpRatio;
+    localSurvivor3D.hpFill.position.x = -(1 - hpRatio) * 0.44;
+    if (hpRatio > 0.5) localSurvivor3D.hpFillMat.color.setHex(0x00e676);
+    else if (hpRatio > 0.25) localSurvivor3D.hpFillMat.color.setHex(0xffea00);
+    else localSurvivor3D.hpFillMat.color.setHex(0xff1744);
+
+    localSurvivor3D.root.visible = running && (!isMultiplayer || isAlive);
+  }
+
+  // 4. Update Remote Survivors (Multiplayer)
+  if (isMultiplayer) {
+    const activeSlots = new Set();
+    for (const rp of roomPlayers) {
+      if (rp.slot === mySlot) continue;
+      activeSlots.add(rp.slot);
+
+      let rem = remoteSurvivors3D.get(rp.slot);
+      if (!rem) {
+        rem = buildSurvivor3D(rp.skinId || 'default', rp.name || `P${rp.slot + 1}`, false);
+        scene3D.add(rem.root);
+        remoteSurvivors3D.set(rp.slot, rem);
+      }
+
+      rem.root.position.set(rp.x || 0, 0, rp.y || 0);
+      rem.root.visible = !!rp.isAlive;
+      rem.iceMesh.visible = !!rp.isFrozen;
+
+      const remHp = Math.max(0, Math.min(1, (rp.hp !== undefined ? rp.hp : MAX_HP) / MAX_HP));
+      rem.hpFill.scale.x = remHp;
+      rem.hpFill.position.x = -(1 - remHp) * 0.44;
+    }
+
+    for (const [slot, rem] of remoteSurvivors3D.entries()) {
+      if (!activeSlots.has(slot)) {
+        scene3D.remove(rem.root);
+        remoteSurvivors3D.delete(slot);
+      }
+    }
+  }
+
+  // 5. Update Reticle & Trajectory
+  if (reticle3D) {
+    reticle3D.position.set(bombTarget.x, 0.04, bombTarget.y);
+    reticle3D.rotation.z += dt * 0.002;
+    reticle3D.visible = running && !paused && bombAmmo > 0;
+    updateTrajectory3D();
+  }
+
+  // 6. Update Thrown Bombs
+  const activeBombIds = new Set();
+  for (const b of thrownBombs) {
+    activeBombIds.add(b.id);
+    let bm = thrownBombMeshes3D.get(b.id);
+    if (!bm) {
+      bm = createThrownBombMesh3D();
+      scene3D.add(bm.group);
+      thrownBombMeshes3D.set(b.id, bm);
+    }
+
+    bm.group.position.set(b.x, b.z || 0.2, b.y);
+    if (b.state === 'flying') {
+      bm.group.rotation.x += dt * 0.015;
+      bm.group.rotation.z += dt * 0.01;
+    } else {
+      bm.sparkMat.color.setHex((Math.sin(performance.now() * 0.035) > 0) ? 0xff1744 : 0xfbbf24);
+      bm.group.position.x += (Math.random() - 0.5) * 0.02;
+    }
+  }
+  for (const [id, bm] of thrownBombMeshes3D.entries()) {
+    if (!activeBombIds.has(id)) {
+      scene3D.remove(bm.group);
+      thrownBombMeshes3D.delete(id);
+    }
+  }
+
+  // 7. Update Disasters
+  // Volcano Lava Wall
+  if (lavaWallGroup3D) {
+    if (fireWave && fireWave.state === 'sweeping') {
+      lavaWallGroup3D.visible = true;
+      const front = fireWave.frontPos;
+      if (fireWave.dir === 'left') {
+        lavaWallGroup3D.position.set(front, 0, GRID / 2);
+        lavaWallGroup3D.rotation.y = 0;
+      } else if (fireWave.dir === 'right') {
+        lavaWallGroup3D.position.set(GRID - front, 0, GRID / 2);
+        lavaWallGroup3D.rotation.y = Math.PI;
+      } else if (fireWave.dir === 'top') {
+        lavaWallGroup3D.position.set(GRID / 2, 0, front);
+        lavaWallGroup3D.rotation.y = Math.PI / 2;
+      } else {
+        lavaWallGroup3D.position.set(GRID / 2, 0, GRID - front);
+        lavaWallGroup3D.rotation.y = -Math.PI / 2;
+      }
+      pointLightFire3D.intensity = 2.8;
+      pointLightFire3D.position.set(lavaWallGroup3D.position.x, 2, lavaWallGroup3D.position.z);
+    } else {
+      lavaWallGroup3D.visible = false;
+      pointLightFire3D.intensity = 0;
+    }
+  }
+
+  // Rain
+  if (rainParticles3D) {
+    if (thunderstorm) {
+      rainParticles3D.visible = true;
+      const posAttr = rainParticles3D.geometry.attributes.position;
+      const arr = posAttr.array;
+      for (let i = 0; i < arr.length; i += 3) {
+        arr[i]     -= 0.06;
+        arr[i + 1] -= 0.38;
+        arr[i + 2] += 0.02;
+        if (arr[i + 1] < 0) {
+          arr[i]     = Math.random() * (GRID + 8) - 4;
+          arr[i + 1] = 22;
+          arr[i + 2] = Math.random() * (GRID + 8) - 4;
+        }
+      }
+      posAttr.needsUpdate = true;
+
+      // Lightning strike check
+      let activeStrike = null;
+      if (thunderstorm.strikes) {
+        activeStrike = thunderstorm.strikes.find(s => s.state === 'striking');
+      }
+
+      if (activeStrike) {
+        const sx = activeStrike.cx;
+        const sz = activeStrike.cy;
+        const boltPoints = [
+          new THREE.Vector3(sx + (Math.random() - 0.5) * 4, 22, sz + (Math.random() - 0.5) * 4),
+          new THREE.Vector3(sx + 1.2, 16, sz - 0.8),
+          new THREE.Vector3(sx - 0.9, 11, sz + 1.1),
+          new THREE.Vector3(sx + 0.6, 6, sz - 0.5),
+          new THREE.Vector3(sx, 0, sz)
+        ];
+        lightningBolt3D.boltGeo.setFromPoints(boltPoints);
+        lightningBolt3D.group.visible = true;
+        pointLightLightning3D.intensity = 6.0;
+        pointLightLightning3D.position.set(sx, 4, sz);
+      } else {
+        lightningBolt3D.group.visible = false;
+        pointLightLightning3D.intensity = Math.max(0, pointLightLightning3D.intensity - dt * 0.015);
+      }
+    } else {
+      rainParticles3D.visible = false;
+      lightningBolt3D.group.visible = false;
+      pointLightLightning3D.intensity = 0;
+    }
+  }
+
+  // Tornadoes
+  for (let i = 0; i < tornadoGroups3D.length; i++) {
+    const tg = tornadoGroups3D[i];
+    if (i < tornadoes.length && tornadoes[i].state === 'active') {
+      const t = tornadoes[i];
+      tg.visible = true;
+      tg.position.set(t.x / CELL, 0, t.y / CELL);
+      tg.rotation.y += dt * 0.025;
+    } else {
+      tg.visible = false;
+    }
+  }
+
+  // 8. Update Items (Pickups)
+  const activeItemIndices = new Set();
+  for (let i = 0; i < items.length; i++) {
+    const it = items[i];
+    activeItemIndices.add(i);
+    let im = itemMeshes3D.get(i);
+    if (!im) {
+      im = createItemMesh3D(it.type);
+      scene3D.add(im);
+      itemMeshes3D.set(i, im);
+    }
+    im.position.x = it.x;
+    im.position.z = it.y;
+    im.position.y = 0.45 + Math.sin(performance.now() * 0.005 + it.x) * 0.12;
+    im.rotation.y += dt * 0.003;
+  }
+  for (const [idx, im] of itemMeshes3D.entries()) {
+    if (!activeItemIndices.has(idx)) {
+      scene3D.remove(im);
+      itemMeshes3D.delete(idx);
+    }
+  }
+
+  // Render 3D Scene
+  renderer3D.render(scene3D, camera3D);
+}
+
+// Gọi khởi tạo 3D Engine
+if (typeof THREE !== 'undefined') {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init3DScene);
+  } else {
+    init3DScene();
+  }
+}
+
 // ── Controls: PC Di chuyển khi nhấn giữ, nhả ra là đứng yên ──
+// "nếu pc di chuyển nút a s d w còn khi điều khiển chỗ ném bom di chuyển nút mũi tên trái lên xuốn phải + bấm nút f để thả"
 function getMovementDirName(e) {
   const code = e.code;
-  if (code === 'KeyW' || code === 'ArrowUp') return 'up';
-  if (code === 'KeyS' || code === 'ArrowDown') return 'down';
-  if (code === 'KeyA' || code === 'ArrowLeft') return 'left';
-  if (code === 'KeyD' || code === 'ArrowRight') return 'right';
+  if (code === 'KeyW') return 'up';
+  if (code === 'KeyS') return 'down';
+  if (code === 'KeyA') return 'left';
+  if (code === 'KeyD') return 'right';
 
   const k = (e.key || '').toLowerCase();
-  if (k === 'w' || k === 'arrowup' || k === 'ư') return 'up';
-  if (k === 's' || k === 'arrowdown') return 'down';
-  if (k === 'a' || k === 'arrowleft') return 'left';
-  if (k === 'd' || k === 'arrowright') return 'right';
+  if (k === 'w' || k === 'ư') return 'up';
+  if (k === 's') return 'down';
+  if (k === 'a') return 'left';
+  if (k === 'd') return 'right';
 
   return null;
 }
@@ -4094,6 +5268,35 @@ document.addEventListener('keydown', e => {
     return;
   }
 
+  // Điều khiển ngắm Quăng Bom bằng phím mũi tên ("chỗ ném bom di chuyển nút mũi tên trái lên xuốn phải")
+  if (e.code === 'ArrowUp' || e.key === 'ArrowUp') {
+    e.preventDefault();
+    aimKeysDown.add('aim_up');
+    return;
+  }
+  if (e.code === 'ArrowDown' || e.key === 'ArrowDown') {
+    e.preventDefault();
+    aimKeysDown.add('aim_down');
+    return;
+  }
+  if (e.code === 'ArrowLeft' || e.key === 'ArrowLeft') {
+    e.preventDefault();
+    aimKeysDown.add('aim_left');
+    return;
+  }
+  if (e.code === 'ArrowRight' || e.key === 'ArrowRight') {
+    e.preventDefault();
+    aimKeysDown.add('aim_right');
+    return;
+  }
+
+  // Phím F: Quăng Bom ("+ bấm nút f để thả")
+  if (e.code === 'KeyF' || e.key === 'f' || e.key === 'F') {
+    e.preventDefault();
+    if (running && !paused) throwBomb();
+    return;
+  }
+
   if (e.key === '1' || e.code === 'Digit1') {
     e.preventDefault();
     if (running && !paused) deployTrap();
@@ -4106,8 +5309,8 @@ document.addEventListener('keydown', e => {
     return;
   }
 
-  // Key 3, F, J, or Space: Shoot Gun
-  if (e.key === '3' || e.code === 'Digit3' || e.key === 'f' || e.key === 'F' || e.key === 'j' || e.key === 'J' || e.key === ' ' || e.code === 'Space') {
+  // Key 3, J, or Space: Shoot Gun
+  if (e.key === '3' || e.code === 'Digit3' || e.key === 'j' || e.key === 'J' || e.key === ' ' || e.code === 'Space') {
     e.preventDefault();
     if (running && !paused) shootGun();
     return;
@@ -4137,6 +5340,7 @@ function exitToMainMenu() {
   paused = false;
   isCountingDown = false;
   keysDown.clear();
+  aimKeysDown.clear();
   dir = { x: 0, y: 0 };
   nextDir = { x: 0, y: 0 };
   if (loopId) {
@@ -4158,10 +5362,16 @@ function exitToMainMenu() {
   elOverStart.classList.remove('hidden');
   updateCoinDisplays();
   draw();
+  if (typeof render3D === 'function') render3D(16);
 }
 window.exitToMainMenu = exitToMainMenu;
 
 document.addEventListener('keyup', e => {
+  if (e.code === 'ArrowUp' || e.key === 'ArrowUp') aimKeysDown.delete('aim_up');
+  if (e.code === 'ArrowDown' || e.key === 'ArrowDown') aimKeysDown.delete('aim_down');
+  if (e.code === 'ArrowLeft' || e.key === 'ArrowLeft') aimKeysDown.delete('aim_left');
+  if (e.code === 'ArrowRight' || e.key === 'ArrowRight') aimKeysDown.delete('aim_right');
+
   const moveDir = getMovementDirName(e);
   if (moveDir) {
     keysDown.delete(moveDir);
@@ -4177,6 +5387,7 @@ document.addEventListener('keyup', e => {
 
 window.addEventListener('blur', () => {
   keysDown.clear();
+  aimKeysDown.clear();
   if (!joystickActive) {
     dir.x = 0;
     dir.y = 0;
@@ -4188,6 +5399,7 @@ window.addEventListener('blur', () => {
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) {
     keysDown.clear();
+    aimKeysDown.clear();
     if (!joystickActive) {
       dir.x = 0;
       dir.y = 0;
@@ -5168,6 +6380,25 @@ function handleNetworkMessage(msg) {
       showCombatAlert(`🔫 ${sName} bắn trúng ${vName} (-${msg.damage} HP)!`, 'danger');
       if (msg.victimSlot === mySlot) {
         takeDamage(msg.damage, `Bị bắn hạ bởi ${sName}!`);
+      }
+      break;
+    }
+
+    case 'BOMB_THROWN': {
+      if (msg.ownerSlot !== mySlot) {
+        if (!thrownBombs.some(b => b.id === msg.bomb.id)) {
+          thrownBombs.push(msg.bomb);
+          spawnFloatingText('QUĂNG BOM! 💣', msg.bomb.startX, msg.bomb.startY, '#f59e0b');
+        }
+      }
+      break;
+    }
+
+    case 'BOMB_EXPLODED': {
+      const b = thrownBombs.find(tb => tb.id === msg.bombId);
+      if (b) {
+        explodeThrownBomb(b);
+        thrownBombs = thrownBombs.filter(tb => tb.id !== msg.bombId);
       }
       break;
     }

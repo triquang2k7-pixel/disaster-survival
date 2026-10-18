@@ -298,6 +298,18 @@ body {
 .inv-slot:active {
   transform: translateY(0) scale(.96);
 }
+.inv-slot.bomb-slot {
+  border-color: rgba(245, 158, 11, .4);
+}
+.inv-slot.bomb-slot:hover {
+  border-color: #fbbf24;
+  box-shadow: 0 4px 16px rgba(245, 158, 11, .5);
+}
+.inv-slot.bomb-slot .slot-key {
+  background: rgba(245, 158, 11, .2);
+  color: #fbbf24;
+  border-color: rgba(245, 158, 11, .45);
+}
 .inv-slot.gun-slot {
   border-color: rgba(255, 145, 0, .35);
 }
@@ -383,7 +395,7 @@ canvas {
   height: 100% !important;
   aspect-ratio: 1 / 1;
   touch-action: none;
-  background: #111e14;
+  background: #020617;
 }
 
 /* ── Overlays ─────────────────────────────────── */
@@ -1009,6 +1021,19 @@ canvas {
 .circle-btn.mine-btn:active {
   border-color: #ff1744;
   box-shadow: 0 0 16px rgba(255, 23, 68, 0.5);
+}
+
+.circle-btn.bomb-btn {
+  width: 42px;
+  height: 42px;
+  border: 1.8px solid rgba(245, 158, 11, 0.55);
+  background: radial-gradient(circle, rgba(245, 158, 11, 0.22) 0%, rgba(15, 23, 42, 0.9) 100%);
+  color: #fbbf24;
+  box-shadow: 0 3px 12px rgba(245, 158, 11, 0.3);
+}
+.circle-btn.bomb-btn:active {
+  border-color: #fbbf24;
+  box-shadow: 0 0 16px rgba(245, 158, 11, 0.6);
 }
 
 /* Shoot Button (Large Primary circle) */
@@ -1893,3 +1918,16 @@ canvas {
   0%   { transform: translateX(-50%) translateY(-14px) scale(0.9); opacity: 0; }
   100% { transform: translateX(-50%) translateY(0) scale(1); opacity: 1; }
 }
+
+#webglCanvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100% !important;
+  height: 100% !important;
+  display: block;
+  border-radius: 18px;
+  background: #020617;
+  touch-action: none;
+}
+
