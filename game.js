@@ -726,8 +726,37 @@ function startGame() {
       me.isFrozen = false;
       me.score = 0;
       me.time = 0;
+      me.skinId = equippedSkinId;
+    }
+    // Set initial spawn coordinates for all teammates if not set yet
+    for (const rp of roomPlayers) {
+      if (rp.x === undefined) {
+        const sp = INITIAL_SPAWNS[rp.slot % 4] || { x: 10, y: 10 };
+        rp.x = sp.x;
+        rp.y = sp.y;
+        rp.isAlive = true;
+        rp.hp = MAX_HP;
+      }
     }
     updateMultiHud();
+
+    // Broadcast instant PLAYER_MOVE so all teammates receive spawn locations immediately
+    broadcastNetworkMessage({
+      type: 'PLAYER_MOVE',
+      slot: mySlot,
+      x: player.x,
+      y: player.y,
+      dir: { x: 0, y: 0 },
+      angle: player.angle,
+      runDist: 0,
+      hp: hp,
+      isFrozen: false,
+      score: 0,
+      time: 0,
+      isAlive: true,
+      hasGun: gunAmmo > 0,
+      skinId: equippedSkinId,
+    });
   }
 
   lastTime = performance.now();
@@ -5040,7 +5069,7 @@ function render3D(dt) {
     else if (hpRatio > 0.25) localSurvivor3D.hpFillMat.color.setHex(0xffea00);
     else localSurvivor3D.hpFillMat.color.setHex(0xff1744);
 
-    localSurvivor3D.root.visible = running && (!isMultiplayer || isAlive);
+    localSurvivor3D.root.visible = running && (!isMultiplayer || (!isSpectator && hp > 0));
   }
 
   // 4. Update Remote Survivors (Multiplayer)
@@ -5053,17 +5082,62 @@ function render3D(dt) {
       let rem = remoteSurvivors3D.get(rp.slot);
       if (!rem) {
         rem = buildSurvivor3D(rp.skinId || 'default', rp.name || `P${rp.slot + 1}`, false);
+        rem.skinId = rp.skinId || 'default';
         scene3D.add(rem.root);
         remoteSurvivors3D.set(rp.slot, rem);
+      } else if (rp.skinId && rem.skinId !== rp.skinId) {
+        rem.skinId = rp.skinId;
+        const newColor = getSkinHex(rp.skinId);
+        rem.torsoMat.color.setHex(newColor);
       }
 
-      rem.root.position.set(rp.x || 0, 0, rp.y || 0);
-      rem.root.visible = !!rp.isAlive;
+      // Default position if not received yet: use INITIAL_SPAWNS[rp.slot % 4]
+      const spawnDef = INITIAL_SPAWNS[rp.slot % 4] || { x: 10, y: 10 };
+      const targetX = rp.x !== undefined ? rp.x : spawnDef.x;
+      const targetY = rp.y !== undefined ? rp.y : spawnDef.y;
+
+      if (rem.curX === undefined) {
+        rem.curX = targetX;
+        rem.curY = targetY;
+      } else {
+        const lerpFactor = Math.min(1, dt * 0.018);
+        rem.curX += (targetX - rem.curX) * lerpFactor;
+        rem.curY += (targetY - rem.curY) * lerpFactor;
+      }
+      rem.root.position.set(rem.curX, 0, rem.curY);
+
+      if (rp.angle !== undefined) {
+        rem.root.rotation.y = -rp.angle + Math.PI / 2;
+      }
+
+      // Animate remote walking if moving
+      const isRemMoving = rp.dir && (rp.dir.x !== 0 || rp.dir.y !== 0);
+      rem.bodyGroup.rotation.x = isRemMoving ? 0.14 : 0;
+      if (isRemMoving) {
+        rem.walkPhase = (rem.walkPhase || 0) + dt * 0.015;
+        rem.leftLegPivot.rotation.x = Math.sin(rem.walkPhase) * 0.6;
+        rem.rightLegPivot.rotation.x = -Math.sin(rem.walkPhase) * 0.6;
+        rem.leftArmPivot.rotation.x = -Math.sin(rem.walkPhase) * 0.5;
+        rem.rightArmPivot.rotation.x = Math.sin(rem.walkPhase) * 0.5;
+        rem.bodyGroup.position.y = Math.abs(Math.sin(rem.walkPhase * 2)) * 0.06;
+      } else {
+        rem.leftLegPivot.rotation.x = 0;
+        rem.rightLegPivot.rotation.x = 0;
+        rem.leftArmPivot.rotation.x = 0;
+        rem.rightArmPivot.rotation.x = 0;
+        rem.bodyGroup.position.y = Math.sin(performance.now() * 0.003 + rp.slot) * 0.02;
+      }
+
+      const isPlayerAlive = rp.isAlive !== false && (rp.hp === undefined || rp.hp > 0);
+      rem.root.visible = running && isPlayerAlive;
       rem.iceMesh.visible = !!rp.isFrozen;
 
       const remHp = Math.max(0, Math.min(1, (rp.hp !== undefined ? rp.hp : MAX_HP) / MAX_HP));
       rem.hpFill.scale.x = remHp;
       rem.hpFill.position.x = -(1 - remHp) * 0.44;
+      if (remHp > 0.5) rem.hpFillMat.color.setHex(0x00e676);
+      else if (remHp > 0.25) rem.hpFillMat.color.setHex(0xffea00);
+      else rem.hpFillMat.color.setHex(0xff1744);
     }
 
     for (const [slot, rem] of remoteSurvivors3D.entries()) {
@@ -5071,6 +5145,13 @@ function render3D(dt) {
         scene3D.remove(rem.root);
         remoteSurvivors3D.delete(slot);
       }
+    }
+  } else {
+    if (typeof remoteSurvivors3D !== 'undefined' && remoteSurvivors3D.size > 0) {
+      for (const [slot, rem] of remoteSurvivors3D.entries()) {
+        scene3D.remove(rem.root);
+      }
+      remoteSurvivors3D.clear();
     }
   }
 
@@ -6106,6 +6187,13 @@ function leaveOnlineRoom() {
   currentRoomCode = null;
   roomPlayers = [];
 
+  if (typeof remoteSurvivors3D !== 'undefined' && scene3D) {
+    for (const [slot, rem] of remoteSurvivors3D.entries()) {
+      scene3D.remove(rem.root);
+    }
+    remoteSurvivors3D.clear();
+  }
+
   if (elMultiHud) elMultiHud.classList.add('hidden');
   if (elViewOnlineLobby) elViewOnlineLobby.classList.add('hidden');
   if (elViewOnlineMenu) elViewOnlineMenu.classList.remove('hidden');
@@ -6145,6 +6233,14 @@ function returnToLobby() {
   isCountingDown = false;
   if (elOverCountdown) elOverCountdown.classList.add('hidden');
   if (loopId) cancelAnimationFrame(loopId);
+
+  if (typeof remoteSurvivors3D !== 'undefined' && scene3D) {
+    for (const [slot, rem] of remoteSurvivors3D.entries()) {
+      scene3D.remove(rem.root);
+    }
+    remoteSurvivors3D.clear();
+  }
+
   elOverMultiGO.classList.add('hidden');
   elOverOnline.classList.remove('hidden');
   elViewOnlineMenu.classList.add('hidden');
