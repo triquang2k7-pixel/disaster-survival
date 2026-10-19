@@ -1480,6 +1480,7 @@ function startFireWave() {
     isFullSweep: isFullSweep,
     sweepAcc: 0,
     thickness: isDiag ? 4 : 3,
+    stepCells: new Map(), // Lưu trữ cụm lửa ngẫu nhiên tự nhiên theo từng bước tràn
   };
 }
 
@@ -1528,83 +1529,83 @@ function updateFireWave(dt) {
       const pos = fw.frontPos - offset;
       if (pos < 0 || pos > fw.maxDistance) continue;
 
-      if (!fw.isDiag) {
-        for (let r = 0; r < GRID; r++) {
-          let gx, gy;
-          if (fw.dir === 'left') { gx = pos; gy = r; }
-          else if (fw.dir === 'right') { gx = GRID - 1 - pos; gy = r; }
-          else if (fw.dir === 'top') { gx = r; gy = pos; }
-          else { gx = r; gy = GRID - 1 - pos; }
-
-          const key = `${gx},${gy}`;
-          fireCells.add(key);
-          burntGrass.set(key, 12000);
-        }
-      } else {
-        for (let i = 0; i < GRID; i++) {
-          let gx, gy;
-          if (fw.dir === 'diag-tl') { gx = i; gy = pos - i; }
-          else if (fw.dir === 'diag-tr') { gx = GRID - 1 - i; gy = pos - i; }
-          else if (fw.dir === 'diag-bl') { gx = i; gy = GRID - 1 - (pos - i); }
-          else { gx = GRID - 1 - i; gy = GRID - 1 - (pos - i); }
-
-          if (gx >= 0 && gx < GRID && gy >= 0 && gy < GRID) {
-            const key = `${gx},${gy}`;
-            fireCells.add(key);
-            burntGrass.set(key, 12000);
+      if (!fw.stepCells.has(pos)) {
+        // Thu thập các ô tọa độ ứng viên theo dải quét hiện tại
+        const candidates = [];
+        if (!fw.isDiag) {
+          for (let r = 0; r < GRID; r++) {
+            let gx, gy;
+            if (fw.dir === 'left') { gx = pos; gy = r; }
+            else if (fw.dir === 'right') { gx = GRID - 1 - pos; gy = r; }
+            else if (fw.dir === 'top') { gx = r; gy = pos; }
+            else { gx = r; gy = GRID - 1 - pos; }
+            if (gx >= 0 && gx < GRID && gy >= 0 && gy < GRID) {
+              candidates.push({ x: gx, y: gy });
+            }
+          }
+        } else {
+          for (let i = 0; i < GRID; i++) {
+            let gx, gy;
+            if (fw.dir === 'diag-tl') { gx = i; gy = pos - i; }
+            else if (fw.dir === 'diag-tr') { gx = GRID - 1 - i; gy = pos - i; }
+            else if (fw.dir === 'diag-bl') { gx = i; gy = GRID - 1 - (pos - i); }
+            else { gx = GRID - 1 - i; gy = GRID - 1 - (pos - i); }
+            if (gx >= 0 && gx < GRID && gy >= 0 && gy < GRID) {
+              candidates.push({ x: gx, y: gy });
+            }
           }
         }
-      }
-    }
 
-    // "Khi núi lửa tràn kế bên nó sẽ sinh ra lửa đốt chứ đâu phải random tùy chỗ"
-    // Dung nham tràn qua để lại vệt lửa bốc cháy dọc theo rìa sau và bên cạnh dòng nham
-    const trailPos = fw.frontPos - fw.thickness;
-    if (trailPos >= 0 && trailPos < fw.maxDistance) {
-      if (!fw.isDiag) {
-        for (let r = 0; r < GRID; r++) {
-          if (Math.random() < 0.28 && spreadingFlames.size < 24) {
-            let gx, gy;
-            if (fw.dir === 'left') { gx = trailPos; gy = r; }
-            else if (fw.dir === 'right') { gx = GRID - 1 - trailPos; gy = r; }
-            else if (fw.dir === 'top') { gx = r; gy = trailPos; }
-            else { gx = r; gy = GRID - 1 - trailPos; }
+        // Tạo dòng dung nham & ngọn lửa ngẫu nhiên tự nhiên (KHÔNG thành 1 hàng cứng nhắc)
+        // Tạo 2-3 tâm dòng nham (clusters) và rải lửa ngẫu nhiên ~50%, để lại khe hở an toàn để người chơi né
+        const chosen = [];
+        const numSeeds = Math.min(candidates.length, 2 + Math.floor(Math.random() * 2));
+        const seedIndices = new Set();
+        while (seedIndices.size < numSeeds && seedIndices.size < candidates.length) {
+          seedIndices.add(Math.floor(Math.random() * candidates.length));
+        }
 
-            const key = `${gx},${gy}`;
-            if (!spreadingFlames.has(key) && !puddleCells.has(key)) {
+        candidates.forEach((c, idx) => {
+          let shouldBurn = false;
+          // Gần tâm luồng nham thì xác suất bốc cháy cao (tạo hình dáng suối dung nham tự nhiên)
+          for (const sIdx of seedIndices) {
+            if (Math.abs(idx - sIdx) <= 1 && Math.random() < 0.72) {
+              shouldBurn = true;
+              break;
+            }
+          }
+          // Một vài tia lửa lẻ tẻ bắn ra
+          if (!shouldBurn && Math.random() < 0.22) {
+            shouldBurn = true;
+          }
+
+          if (shouldBurn) {
+            const key = `${c.x},${c.y}`;
+            chosen.push(key);
+            burntGrass.set(key, 12000);
+            spawnFireSparks(c.x, c.y);
+            if (Math.random() < 0.35) {
+              spawnVolcanoEmberArc(c.x, c.y);
+            }
+            // Tỷ lệ nhỏ bén thành đốm lửa cháy âm ỉ
+            if (Math.random() < 0.16 && spreadingFlames.size < 24 && !spreadingFlames.has(key) && !puddleCells.has(key)) {
               spreadingFlames.set(key, {
-                x: gx, y: gy,
+                x: c.x, y: c.y,
                 life: 4500 + Math.random() * 2500, maxLife: 7000,
                 gen: 0,
                 spreadTimer: 700 + Math.random() * 400
               });
-              spawnFireSparks(gx, gy);
             }
           }
-        }
-      } else {
-        for (let i = 0; i < GRID; i++) {
-          if (Math.random() < 0.28 && spreadingFlames.size < 24) {
-            let gx, gy;
-            if (fw.dir === 'diag-tl') { gx = i; gy = trailPos - i; }
-            else if (fw.dir === 'diag-tr') { gx = GRID - 1 - i; gy = trailPos - i; }
-            else if (fw.dir === 'diag-bl') { gx = i; gy = GRID - 1 - (trailPos - i); }
-            else { gx = GRID - 1 - i; gy = GRID - 1 - (trailPos - i); }
+        });
 
-            if (gx >= 0 && gx < GRID && gy >= 0 && gy < GRID) {
-              const key = `${gx},${gy}`;
-              if (!spreadingFlames.has(key) && !puddleCells.has(key)) {
-                spreadingFlames.set(key, {
-                  x: gx, y: gy,
-                  life: 4500 + Math.random() * 2500, maxLife: 7000,
-                  gen: 0,
-                  spreadTimer: 700 + Math.random() * 400
-                });
-                spawnFireSparks(gx, gy);
-              }
-            }
-          }
-        }
+        fw.stepCells.set(pos, chosen);
+      }
+
+      // Đưa các ô lửa của dải này vào fireCells
+      const sliceCells = fw.stepCells.get(pos);
+      if (sliceCells) {
+        for (const k of sliceCells) fireCells.add(k);
       }
     }
 
@@ -4381,7 +4382,10 @@ const trapMeshes3D = new Map();
 const mineMeshes3D = new Map();
 const bulletMeshes3D = new Map();
 
-let lavaWallGroup3D = null;
+let matTileGrassLight3D = null;
+let matTileGrassDark3D = null;
+let grassTufts3D = [];
+let rainRipples3D = [];
 let rainParticles3D = null;
 let lightningBolt3D = null;
 const tornadoGroups3D = [];
@@ -4428,11 +4432,11 @@ function init3DScene() {
   renderer3D.toneMapping = THREE.ACESFilmicToneMapping;
   renderer3D.toneMappingExposure = 1.25;
 
-  // Lights
-  ambientLight3D = new THREE.AmbientLight(0x475569, 0.95);
+  // Lights: Warm sunlight & soft sky ambient for nature graphics
+  ambientLight3D = new THREE.AmbientLight(0x52657d, 1.15);
   scene3D.add(ambientLight3D);
 
-  dirLight3D = new THREE.DirectionalLight(0xfff7ed, 1.45);
+  dirLight3D = new THREE.DirectionalLight(0xfffaed, 1.35);
   dirLight3D.position.set(16, 30, 24);
   dirLight3D.castShadow = true;
   dirLight3D.shadow.mapSize.set(1024, 1024);
@@ -4444,7 +4448,7 @@ function init3DScene() {
   dirLight3D.shadow.camera.bottom = -18;
   scene3D.add(dirLight3D);
 
-  rimLight3D = new THREE.DirectionalLight(0x00e5ff, 0.65);
+  rimLight3D = new THREE.DirectionalLight(0x00e5ff, 0.55);
   rimLight3D.position.set(-16, 14, -16);
   scene3D.add(rimLight3D);
 
@@ -4460,20 +4464,27 @@ function init3DScene() {
   pointLightBomb3D.position.set(GRID / 2, 2, GRID / 2);
   scene3D.add(pointLightBomb3D);
 
-  // Floating Cyber Arena Base (Clean seamless platform - perfectly hugs the 20x20 grid)
+  // Floating Natural Meadow Island Base (Rich dark soil bedrock - hugs 20x20 grid)
   const baseGeo = new THREE.BoxGeometry(GRID + 0.35, 0.8, GRID + 0.35);
-  const baseMat = new THREE.MeshStandardMaterial({ color: 0x0a101d, roughness: 0.85, metalness: 0.4 });
+  const baseMat = new THREE.MeshStandardMaterial({ color: 0x1c1712, roughness: 0.94, metalness: 0.05 });
   const baseMesh = new THREE.Mesh(baseGeo, baseMat);
   baseMesh.position.set(GRID / 2, -0.45, GRID / 2);
   baseMesh.receiveShadow = true;
   scene3D.add(baseMesh);
 
-  // Vibrant, High-Intensity 3D Disaster Materials
-  matTileNormal3D = new THREE.MeshStandardMaterial({
-    color: 0x0f172a,
-    roughness: 0.45,
-    metalness: 0.5
+  // Lush Nature Meadow & Disaster Materials
+  matTileGrassLight3D = new THREE.MeshStandardMaterial({
+    color: 0x3d8b40, // Fresh vibrant meadow green
+    roughness: 0.82,
+    metalness: 0.04
   });
+  matTileGrassDark3D = new THREE.MeshStandardMaterial({
+    color: 0x2e7332, // Deep emerald forest grass
+    roughness: 0.85,
+    metalness: 0.04
+  });
+  matTileNormal3D = matTileGrassLight3D;
+
   matTileFire3D = new THREE.MeshStandardMaterial({
     color: 0xff3d00,
     emissive: 0xff2200,
@@ -4487,19 +4498,19 @@ function init3DScene() {
     roughness: 0.25
   });
   matTileScorched3D = new THREE.MeshStandardMaterial({
-    color: 0x241208,
-    emissive: 0xd97706,
-    emissiveIntensity: 0.85,
-    roughness: 0.85
+    color: 0x1b120a, // Charred ash / burnt soil
+    emissive: 0xb45309,
+    emissiveIntensity: 0.7,
+    roughness: 0.95
   });
   matTileWater3D = new THREE.MeshStandardMaterial({
-    color: 0x00b4d8,
-    emissive: 0x0284c7,
-    emissiveIntensity: 0.55,
-    roughness: 0.08,
+    color: 0x0284c7, // Vibrant aquatic rainwater
+    emissive: 0x0369a1,
+    emissiveIntensity: 0.35,
+    roughness: 0.05,
     metalness: 0.85,
     transparent: true,
-    opacity: 0.92
+    opacity: 0.94
   });
   matTileElectric3D = new THREE.MeshStandardMaterial({
     color: 0xffea00,
@@ -4532,14 +4543,22 @@ function init3DScene() {
 
   const tileGeo = new THREE.BoxGeometry(0.94, 0.18, 0.94);
   tileMeshes3D = [];
+  grassTufts3D = [];
   for (let x = 0; x < GRID; x++) {
     tileMeshes3D[x] = [];
+    grassTufts3D[x] = [];
     for (let z = 0; z < GRID; z++) {
-      const tile = new THREE.Mesh(tileGeo, matTileNormal3D);
+      const defaultMat = (x + z) % 2 === 0 ? matTileGrassLight3D : matTileGrassDark3D;
+      const tile = new THREE.Mesh(tileGeo, defaultMat);
       tile.position.set(x + 0.5, -0.09, z + 0.5);
       tile.receiveShadow = true;
       scene3D.add(tile);
       tileMeshes3D[x][z] = tile;
+
+      // 3D Grass Tufts planted across each natural tile
+      const tuft = createGrassTuftGroup3D(x, z);
+      scene3D.add(tuft);
+      grassTufts3D[x][z] = tuft;
     }
   }
 
@@ -4551,12 +4570,12 @@ function init3DScene() {
   reticle3D = buildReticle3D();
   scene3D.add(reticle3D);
 
-  // Disasters
-  lavaWallGroup3D = buildLavaWall3D();
-  scene3D.add(lavaWallGroup3D);
-
+  // Disasters (Lava spikes completely removed)
   rainParticles3D = buildRain3D();
-  scene3D.add(rainParticles3D);
+  scene3D.add(rainParticles3D.group);
+
+  rainRipples3D = buildRainRipples3D();
+  rainRipples3D.forEach(r => scene3D.add(r.mesh));
 
   lightningBolt3D = buildLightningBolt3D();
   scene3D.add(lightningBolt3D.group);
@@ -4805,24 +4824,122 @@ function updateTrajectory3D() {
 }
 
 function buildRain3D() {
-  const rainCount = 800;
-  const rainGeo = new THREE.BufferGeometry();
-  const positions = new Float32Array(rainCount * 3);
+  const group = new THREE.Group();
+  const rainCount = 650;
+  const positions = new Float32Array(rainCount * 2 * 3);
+  const rainVelocities = [];
+
   for (let i = 0; i < rainCount; i++) {
-    positions[i * 3]     = Math.random() * (GRID + 8) - 4;
-    positions[i * 3 + 1] = Math.random() * 22;
-    positions[i * 3 + 2] = Math.random() * (GRID + 8) - 4;
+    const x = Math.random() * (GRID + 10) - 5;
+    const y = Math.random() * 24 + 1;
+    const z = Math.random() * (GRID + 10) - 5;
+    const len = 0.85 + Math.random() * 0.65;
+    const slant = -0.16;
+    const idx = i * 6;
+
+    positions[idx]     = x;
+    positions[idx + 1] = y;
+    positions[idx + 2] = z;
+    positions[idx + 3] = x + slant * len;
+    positions[idx + 4] = y - len;
+    positions[idx + 5] = z + 0.04 * len;
+
+    rainVelocities.push({
+      speed: 30 + Math.random() * 14,
+      len: len,
+      slant: slant
+    });
   }
+
+  const rainGeo = new THREE.BufferGeometry();
   rainGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-  const rainMat = new THREE.PointsMaterial({
-    color: 0x38bdf8,
-    size: 0.15,
+  const rainMat = new THREE.LineBasicMaterial({
+    color: 0x93c5fd,
     transparent: true,
-    opacity: 0.65
+    opacity: 0.72
   });
-  const rain = new THREE.Points(rainGeo, rainMat);
-  rain.visible = false;
-  return rain;
+
+  const lineSegments = new THREE.LineSegments(rainGeo, rainMat);
+  group.add(lineSegments);
+  group.visible = false;
+
+  return { group, lineSegments, rainGeo, velocities: rainVelocities };
+}
+
+function buildRainRipples3D() {
+  const ripples = [];
+  const ringGeo = new THREE.RingGeometry(0.08, 0.16, 16);
+  ringGeo.rotateX(-Math.PI / 2);
+
+  for (let i = 0; i < 28; i++) {
+    const ringMat = new THREE.MeshBasicMaterial({
+      color: 0x7dd3fc,
+      transparent: true,
+      opacity: 0,
+      side: THREE.DoubleSide
+    });
+    const mesh = new THREE.Mesh(ringGeo, ringMat);
+    mesh.position.y = 0.03;
+    mesh.visible = false;
+    ripples.push({
+      mesh,
+      mat: ringMat,
+      life: 0,
+      maxLife: 550,
+      targetScale: 2.4 + Math.random() * 1.5
+    });
+  }
+  return ripples;
+}
+
+function createGrassTuftGroup3D(gx, gz) {
+  const group = new THREE.Group();
+  group.position.set(gx + 0.5, 0, gz + 0.5);
+
+  const matBladeA = new THREE.MeshStandardMaterial({
+    color: 0x4ade80, // Fresh lime-emerald grass
+    roughness: 0.75,
+    metalness: 0.04
+  });
+  const matBladeB = new THREE.MeshStandardMaterial({
+    color: 0x22c55e, // Deep meadow grass
+    roughness: 0.8,
+    metalness: 0.04
+  });
+
+  // 3-4 tapered grass blades per tuft
+  const bladeGeo = new THREE.ConeGeometry(0.038, 0.34, 4);
+  bladeGeo.translate(0, 0.17, 0);
+
+  const configs = [
+    { dx: -0.1, dz: -0.06, rx: 0.18, rz: -0.22, s: 1.0, mat: matBladeA },
+    { dx: 0.08, dz: -0.04, rx: -0.14, rz: 0.25, s: 0.88, mat: matBladeB },
+    { dx: -0.04, dz: 0.08, rx: 0.24, rz: 0.12, s: 0.95, mat: matBladeA },
+    { dx: 0.09, dz: 0.07, rx: -0.2, rz: -0.16, s: 0.8, mat: matBladeB }
+  ];
+
+  for (const c of configs) {
+    const m = new THREE.Mesh(bladeGeo, c.mat);
+    m.position.set(c.dx, 0, c.dz);
+    m.rotation.set(c.rx, Math.random() * Math.PI, c.rz);
+    m.scale.setScalar(c.s);
+    group.add(m);
+  }
+
+  // Wildflower on ~16% of grassy tiles
+  if ((gx * 11 + gz * 17) % 6 === 0) {
+    const isDaisy = (gx + gz) % 2 === 0;
+    const stemMat = new THREE.MeshBasicMaterial({ color: 0x16a34a });
+    const flowerMat = new THREE.MeshBasicMaterial({ color: isDaisy ? 0xffffff : 0xfacc15 });
+    const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.38, 5), stemMat);
+    stem.position.set(0.02, 0.19, -0.08);
+    group.add(stem);
+    const petal = new THREE.Mesh(new THREE.SphereGeometry(0.065, 8, 8), flowerMat);
+    petal.position.set(0.02, 0.38, -0.08);
+    group.add(petal);
+  }
+
+  return group;
 }
 
 function buildLightningBolt3D() {
@@ -4891,29 +5008,6 @@ function buildTornado3D() {
   group.add(warnRing);
 
   return { group, warnRing };
-}
-
-function buildLavaWall3D() {
-  const group = new THREE.Group();
-  const count = 22;
-  const coneGeo = new THREE.ConeGeometry(0.52, 2.2, 7);
-  const lavaMat = new THREE.MeshStandardMaterial({
-    color: 0xff3d00,
-    emissive: 0xff1744,
-    emissiveIntensity: 2.6,
-    roughness: 0.4
-  });
-
-  for (let i = 0; i < count; i++) {
-    const rock = new THREE.Mesh(coneGeo, lavaMat);
-    rock.position.set(0, 1.0, (i / (count - 1) - 0.5) * GRID);
-    rock.rotation.y = Math.random() * Math.PI * 2;
-    rock.rotation.z = (Math.random() - 0.5) * 0.35;
-    group.add(rock);
-  }
-
-  group.visible = false;
-  return group;
 }
 
 function createFireFlameMesh3D() {
@@ -5202,6 +5296,18 @@ function render3D(dt) {
       const tile = tileMeshes3D[x][z];
       const key = `${x},${z}`;
 
+      let isEdgeFireWarn = false;
+      if (isFireWaveWarn) {
+        if (fireWarnDir === 'left' && x <= 2) isEdgeFireWarn = true;
+        else if (fireWarnDir === 'right' && x >= GRID - 3) isEdgeFireWarn = true;
+        else if (fireWarnDir === 'top' && z <= 2) isEdgeFireWarn = true;
+        else if (fireWarnDir === 'bottom' && z >= GRID - 3) isEdgeFireWarn = true;
+        else if (fireWarnDir === 'diag-tl' && (x + z <= 3)) isEdgeFireWarn = true;
+        else if (fireWarnDir === 'diag-tr' && (GRID - 1 - x + z <= 3)) isEdgeFireWarn = true;
+        else if (fireWarnDir === 'diag-bl' && (x + GRID - 1 - z <= 3)) isEdgeFireWarn = true;
+        else if (fireWarnDir === 'diag-br' && (GRID - 1 - x + GRID - 1 - z <= 3)) isEdgeFireWarn = true;
+      }
+
       if (sinkholeCells.has(key)) {
         tile.material = matTileSinkhole3D;
         tile.position.y = THREE.MathUtils.lerp(tile.position.y, -0.65, 0.2);
@@ -5210,24 +5316,13 @@ function render3D(dt) {
         tile.position.y = THREE.MathUtils.lerp(tile.position.y, -0.09, 0.2);
         tile.rotation.x = 0;
 
-        let isEdgeFireWarn = false;
-        if (isFireWaveWarn) {
-          if (fireWarnDir === 'left' && x <= 2) isEdgeFireWarn = true;
-          else if (fireWarnDir === 'right' && x >= GRID - 3) isEdgeFireWarn = true;
-          else if (fireWarnDir === 'top' && z <= 2) isEdgeFireWarn = true;
-          else if (fireWarnDir === 'bottom' && z >= GRID - 3) isEdgeFireWarn = true;
-          else if (fireWarnDir === 'diag-tl' && (x + z <= 3)) isEdgeFireWarn = true;
-          else if (fireWarnDir === 'diag-tr' && (GRID - 1 - x + z <= 3)) isEdgeFireWarn = true;
-          else if (fireWarnDir === 'diag-bl' && (x + GRID - 1 - z <= 3)) isEdgeFireWarn = true;
-          else if (fireWarnDir === 'diag-br' && (GRID - 1 - x + GRID - 1 - z <= 3)) isEdgeFireWarn = true;
-        }
-
         if (lightningCells.has(key)) {
           tile.material = matTileLightningWarn3D;
         } else if (electrifiedPuddles.has(key)) {
           tile.material = matTileElectric3D;
         } else if (puddleCells.has(key)) {
           tile.material = matTileWater3D;
+          tile.position.y = -0.05; // Vũng nước mưa trũng nhẹ tự nhiên
         } else if (fireCells.has(key) || spreadingFlames.has(key)) {
           tile.material = matTileFire3D;
         } else if (burntGrass.has(key)) {
@@ -5239,7 +5334,30 @@ function render3D(dt) {
         } else if (craterCells.has(key)) {
           tile.material = matTileCrater3D;
         } else {
-          tile.material = matTileNormal3D;
+          // Ô cỏ thiên nhiên tự nhiên (xen kẽ xanh tươi / xanh đậm)
+          tile.material = (x + z) % 2 === 0 ? matTileGrassLight3D : matTileGrassDark3D;
+        }
+      }
+
+      // Cập nhật bụi cỏ 3D (rung rinh theo gió, cháy tàn lụi khi gặp lửa, ẩn khi ngập nước)
+      if (grassTufts3D && grassTufts3D[x] && grassTufts3D[x][z]) {
+        const tuft = grassTufts3D[x][z];
+        const isDamagedOrSubmerged =
+          sinkholeCells.has(key) ||
+          craterCells.has(key) ||
+          fireCells.has(key) ||
+          spreadingFlames.has(key) ||
+          burntGrass.has(key) ||
+          puddleCells.has(key) ||
+          isEdgeFireWarn;
+
+        if (isDamagedOrSubmerged) {
+          tuft.visible = false;
+        } else {
+          tuft.visible = true;
+          const time = performance.now();
+          tuft.rotation.z = Math.sin(time * 0.0025 + x * 0.6 + z * 0.5) * 0.12;
+          tuft.rotation.x = Math.cos(time * 0.002 + x * 0.4 + z * 0.7) * 0.09;
         }
       }
     }
@@ -5404,36 +5522,16 @@ function render3D(dt) {
     }
   }
 
-  // 7. Update Disasters (Vibrant 3D Hazard Effects)
-  // 7.1 Volcano Lava Wall & Fire Glow
+  // 7.1 Volcano Fire Glow & Atmospheric Lighting (No spike wall!)
   const allFireCount = fireCells.size + spreadingFlames.size;
-  if (lavaWallGroup3D) {
-    if (fireWave && fireWave.state === 'sweeping') {
-      lavaWallGroup3D.visible = true;
-      const front = fireWave.frontPos;
-      if (fireWave.dir === 'left') {
-        lavaWallGroup3D.position.set(front, 0, GRID / 2);
-        lavaWallGroup3D.rotation.y = 0;
-      } else if (fireWave.dir === 'right') {
-        lavaWallGroup3D.position.set(GRID - front, 0, GRID / 2);
-        lavaWallGroup3D.rotation.y = Math.PI;
-      } else if (fireWave.dir === 'top') {
-        lavaWallGroup3D.position.set(GRID / 2, 0, front);
-        lavaWallGroup3D.rotation.y = Math.PI / 2;
-      } else {
-        lavaWallGroup3D.position.set(GRID / 2, 0, GRID - front);
-        lavaWallGroup3D.rotation.y = -Math.PI / 2;
-      }
-      pointLightFire3D.intensity = 4.8;
-      pointLightFire3D.position.set(lavaWallGroup3D.position.x, 2.5, lavaWallGroup3D.position.z);
-    } else if (allFireCount > 0) {
-      lavaWallGroup3D.visible = false;
-      pointLightFire3D.intensity = Math.min(4.5, 1.2 + allFireCount * 0.15);
-      pointLightFire3D.position.set(GRID / 2, 2.5, GRID / 2);
-    } else {
-      lavaWallGroup3D.visible = false;
-      pointLightFire3D.intensity = 0;
-    }
+  if (fireWave && fireWave.state === 'sweeping') {
+    pointLightFire3D.intensity = 5.2;
+    pointLightFire3D.position.set(GRID / 2, 2.8, GRID / 2);
+  } else if (allFireCount > 0) {
+    pointLightFire3D.intensity = Math.min(4.8, 1.2 + allFireCount * 0.18);
+    pointLightFire3D.position.set(GRID / 2, 2.5, GRID / 2);
+  } else {
+    pointLightFire3D.intensity = 0;
   }
 
   // 7.2 Dancing 3D Fire Flames on Burning Cells
@@ -5570,23 +5668,72 @@ function render3D(dt) {
     }
   }
 
-  // 7.7 Rain & Lightning Flash
+  // 7.7 Rain Streaks & Water Ripples / Lightning Flash
   if (rainParticles3D) {
     if (thunderstorm) {
-      rainParticles3D.visible = true;
-      const posAttr = rainParticles3D.geometry.attributes.position;
-      const arr = posAttr.array;
-      for (let i = 0; i < arr.length; i += 3) {
-        arr[i]     -= 0.06;
-        arr[i + 1] -= 0.38;
-        arr[i + 2] += 0.02;
-        if (arr[i + 1] < 0) {
-          arr[i]     = Math.random() * (GRID + 8) - 4;
-          arr[i + 1] = 22;
-          arr[i + 2] = Math.random() * (GRID + 8) - 4;
+      rainParticles3D.group.visible = true;
+      const pos = rainParticles3D.rainGeo.attributes.position.array;
+      const vels = rainParticles3D.velocities;
+      const dropDt = Math.min(dt / 1000, 0.045);
+
+      for (let i = 0; i < vels.length; i++) {
+        const idx = i * 6;
+        const dy = vels[i].speed * dropDt;
+        const dx = vels[i].slant * dy;
+        pos[idx + 1] -= dy;
+        pos[idx + 4] -= dy;
+        pos[idx]     += dx;
+        pos[idx + 3] += dx;
+
+        if (pos[idx + 4] < 0) {
+          const rx = Math.random() * (GRID + 10) - 5;
+          const ry = 22 + Math.random() * 4;
+          const rz = Math.random() * (GRID + 10) - 5;
+          const len = vels[i].len;
+          pos[idx]     = rx;
+          pos[idx + 1] = ry;
+          pos[idx + 2] = rz;
+          pos[idx + 3] = rx + vels[i].slant * len;
+          pos[idx + 4] = ry - len;
+          pos[idx + 5] = rz + 0.04 * len;
         }
       }
-      posAttr.needsUpdate = true;
+      rainParticles3D.rainGeo.attributes.position.needsUpdate = true;
+
+      // Ground Water Ripples (Vũng nước mưa loang gợn sóng tự nhiên)
+      if (rainRipples3D && rainRipples3D.length > 0) {
+        if (Math.random() < 0.35) {
+          const freeRip = rainRipples3D.find(r => r.life <= 0);
+          if (freeRip) {
+            let rx, rz;
+            if (puddleCells.size > 0 && Math.random() < 0.6) {
+              const pArr = Array.from(puddleCells);
+              const pKey = pArr[Math.floor(Math.random() * pArr.length)];
+              const [px, pz] = pKey.split(',').map(Number);
+              rx = px + 0.5 + (Math.random() - 0.5) * 0.6;
+              rz = pz + 0.5 + (Math.random() - 0.5) * 0.6;
+            } else {
+              rx = Math.random() * GRID;
+              rz = Math.random() * GRID;
+            }
+            freeRip.mesh.position.set(rx, 0.03, rz);
+            freeRip.mesh.scale.set(0.2, 0.2, 0.2);
+            freeRip.life = freeRip.maxLife;
+            freeRip.mesh.visible = true;
+          }
+        }
+
+        for (const rip of rainRipples3D) {
+          if (rip.life > 0) {
+            rip.life -= dt;
+            const prog = 1 - (rip.life / rip.maxLife);
+            const sc = 0.2 + (rip.targetScale - 0.2) * Math.sin(prog * Math.PI * 0.5);
+            rip.mesh.scale.set(sc, sc, sc);
+            rip.mat.opacity = Math.max(0, (1 - prog) * 0.65);
+            if (rip.life <= 0) rip.mesh.visible = false;
+          }
+        }
+      }
 
       let activeStrike = null;
       if (thunderstorm.strikes) {
@@ -5607,17 +5754,23 @@ function render3D(dt) {
         lightningBolt3D.group.visible = true;
         pointLightLightning3D.intensity = 10.0;
         pointLightLightning3D.position.set(sx, 5, sz);
-        ambientLight3D.intensity = 1.8;
+        ambientLight3D.intensity = 2.4;
       } else {
         lightningBolt3D.group.visible = false;
         pointLightLightning3D.intensity = Math.max(0, pointLightLightning3D.intensity - dt * 0.015);
-        ambientLight3D.intensity = THREE.MathUtils.lerp(ambientLight3D.intensity, 0.95, 0.1);
+        ambientLight3D.intensity = THREE.MathUtils.lerp(ambientLight3D.intensity, 0.75, 0.1);
       }
     } else {
-      rainParticles3D.visible = false;
+      rainParticles3D.group.visible = false;
       lightningBolt3D.group.visible = false;
       pointLightLightning3D.intensity = 0;
-      ambientLight3D.intensity = 0.95;
+      ambientLight3D.intensity = THREE.MathUtils.lerp(ambientLight3D.intensity, 1.15, 0.1);
+      if (rainRipples3D) {
+        for (const rip of rainRipples3D) {
+          rip.life = 0;
+          rip.mesh.visible = false;
+        }
+      }
     }
   }
 
@@ -6532,6 +6685,21 @@ function cleanUpDisasterMeshes3D() {
   if (typeof shockwaveMeshes3D !== 'undefined') {
     for (const [idx, sm] of shockwaveMeshes3D.entries()) scene3D.remove(sm.mesh);
     shockwaveMeshes3D.clear();
+  }
+  if (typeof grassTufts3D !== 'undefined') {
+    for (let x = 0; x < GRID; x++) {
+      if (grassTufts3D[x]) {
+        for (let z = 0; z < GRID; z++) {
+          if (grassTufts3D[x][z]) grassTufts3D[x][z].visible = true;
+        }
+      }
+    }
+  }
+  if (typeof rainRipples3D !== 'undefined') {
+    for (const rip of rainRipples3D) {
+      rip.life = 0;
+      rip.mesh.visible = false;
+    }
   }
 }
 
