@@ -63,6 +63,288 @@ const GUN_BULLET_SPEED = 6; // pixels per frame
 const GUN_BULLET_DAMAGE = 35;
 const GUN_BULLET_MAX_RANGE = CANVAS_PX; // max travel distance
 
+// ── Tốc Biến / Dash Mechanic ──────────────────
+const DASH_COOLDOWN = 2800; // 2.8s
+const DASH_DURATION = 220;  // 220ms
+const DASH_SPEED_MULT = 3.2; // 3.2x speed boost
+let dashCooldown = 0;
+let isDashing = false;
+let dashTimer = 0;
+let dashDir = { x: 0, y: 0 };
+let ghostMeshes3D = [];
+
+// ── Energy Shield & Speed Boost State ─────────
+let hasShield = false;
+let speedBoostTimer = 0;
+
+// ── Mưa Thiên Thạch 3D (Meteor Disaster) ──────
+let meteors = [];
+let meteorTimer = 16000;
+let meteorMeshes3D = new Map();
+
+// ── Cấp Độ Sinh Tồn (Wave Progression) ────────
+let currentWave = 1;
+let waveTimeElapsed = 0;
+const WAVE_DURATION = 22000; // 22s mỗi đợt
+
+// ── Combo & Né Suýt Chết (Near-Miss Dodge) ─────
+let comboCount = 0;
+let lastNearMissTime = 0;
+
+// ── Procedural Web Audio Synthesizer (Zero asset dependencies!) ──
+const SoundFX = {
+  ctx: null,
+  enabled: localStorage.getItem('disaster_sound') !== 'false',
+
+  init() {
+    if (!this.ctx) {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (AudioCtx) this.ctx = new AudioCtx();
+    }
+    if (this.ctx && this.ctx.state === 'suspended') {
+      this.ctx.resume();
+    }
+  },
+
+  toggle() {
+    this.enabled = !this.enabled;
+    localStorage.setItem('disaster_sound', this.enabled ? 'true' : 'false');
+    updateSoundUI();
+    if (this.enabled) {
+      this.init();
+      this.pickup('coin');
+    }
+  },
+
+  dash() {
+    if (!this.enabled) return;
+    this.init();
+    if (!this.ctx) return;
+    try {
+      const t = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(340, t);
+      osc.frequency.exponentialRampToValueAtTime(75, t + 0.2);
+      gain.gain.setValueAtTime(0.28, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start(t);
+      osc.stop(t + 0.2);
+    } catch (e) {}
+  },
+
+  laser() {
+    if (!this.enabled) return;
+    this.init();
+    if (!this.ctx) return;
+    try {
+      const t = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(1150, t);
+      osc.frequency.exponentialRampToValueAtTime(140, t + 0.16);
+      gain.gain.setValueAtTime(0.22, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.16);
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start(t);
+      osc.stop(t + 0.16);
+    } catch (e) {}
+  },
+
+  explosion() {
+    if (!this.enabled) return;
+    this.init();
+    if (!this.ctx) return;
+    try {
+      const t = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(160, t);
+      osc.frequency.exponentialRampToValueAtTime(28, t + 0.48);
+      gain.gain.setValueAtTime(0.42, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.48);
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start(t);
+      osc.stop(t + 0.48);
+    } catch (e) {}
+  },
+
+  pickup(type) {
+    if (!this.enabled) return;
+    this.init();
+    if (!this.ctx) return;
+    try {
+      const t = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sine';
+      if (type === 'coin') {
+        osc.frequency.setValueAtTime(987, t);
+        osc.frequency.setValueAtTime(1318, t + 0.08);
+      } else if (type === 'heart') {
+        osc.frequency.setValueAtTime(523, t);
+        osc.frequency.setValueAtTime(659, t + 0.08);
+        osc.frequency.setValueAtTime(784, t + 0.16);
+      } else if (type === 'shield') {
+        osc.frequency.setValueAtTime(440, t);
+        osc.frequency.setValueAtTime(880, t + 0.09);
+        osc.frequency.setValueAtTime(1760, t + 0.18);
+      } else {
+        osc.frequency.setValueAtTime(587, t);
+        osc.frequency.exponentialRampToValueAtTime(1174, t + 0.16);
+      }
+      gain.gain.setValueAtTime(0.22, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start(t);
+      osc.stop(t + 0.25);
+    } catch (e) {}
+  },
+
+  shieldBreak() {
+    if (!this.enabled) return;
+    this.init();
+    if (!this.ctx) return;
+    try {
+      const t = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(880, t);
+      osc.frequency.exponentialRampToValueAtTime(160, t + 0.32);
+      gain.gain.setValueAtTime(0.35, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.32);
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start(t);
+      osc.stop(t + 0.32);
+    } catch (e) {}
+  },
+
+  thunder() {
+    if (!this.enabled) return;
+    this.init();
+    if (!this.ctx) return;
+    try {
+      const t = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(240, t);
+      osc.frequency.exponentialRampToValueAtTime(35, t + 0.65);
+      gain.gain.setValueAtTime(0.36, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.65);
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start(t);
+      osc.stop(t + 0.65);
+    } catch (e) {}
+  },
+
+  waveClear() {
+    if (!this.enabled) return;
+    this.init();
+    if (!this.ctx) return;
+    try {
+      const notes = [523, 659, 784, 1046];
+      notes.forEach((freq, idx) => {
+        const t = this.ctx.currentTime + idx * 0.09;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, t);
+        gain.gain.setValueAtTime(0.24, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(t);
+        osc.stop(t + 0.22);
+      });
+    } catch (e) {}
+  },
+
+  nearMiss() {
+    if (!this.enabled) return;
+    this.init();
+    if (!this.ctx) return;
+    try {
+      const t = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(1400, t);
+      osc.frequency.exponentialRampToValueAtTime(1760, t + 0.12);
+      gain.gain.setValueAtTime(0.18, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start(t);
+      osc.stop(t + 0.12);
+    } catch (e) {}
+  },
+
+  hurt() {
+    if (!this.enabled) return;
+    this.init();
+    if (!this.ctx) return;
+    try {
+      const t = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(180, t);
+      osc.frequency.exponentialRampToValueAtTime(55, t + 0.22);
+      gain.gain.setValueAtTime(0.3, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start(t);
+      osc.stop(t + 0.22);
+    } catch (e) {}
+  },
+
+  gameOver() {
+    if (!this.enabled) return;
+    this.init();
+    if (!this.ctx) return;
+    try {
+      const notes = [440, 415, 392, 349];
+      notes.forEach((freq, idx) => {
+        const t = this.ctx.currentTime + idx * 0.16;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(freq, t);
+        gain.gain.setValueAtTime(0.25, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(t);
+        osc.stop(t + 0.3);
+      });
+    } catch (e) {}
+  }
+};
+
+function updateSoundUI() {
+  const icon = document.getElementById('soundIcon');
+  if (icon) icon.textContent = SoundFX.enabled ? '🔊' : '🔇';
+}
+
+function toggleSound() {
+  SoundFX.toggle();
+}
+window.toggleSound = toggleSound;
+window.updateSoundUI = updateSoundUI;
+
 // ══════════════════════════════════════════════
 //  SKIN SHOP SYSTEM
 // ══════════════════════════════════════════════
@@ -166,6 +448,44 @@ const elCountMine = document.getElementById('countMine');
 const elCountGun = document.getElementById('countGun');
 const elEventToast = document.getElementById('eventToast');
 const elToastText = document.getElementById('toastText');
+
+// Buffs & Wave DOM refs
+const elShieldBuff = document.getElementById('shieldBuff');
+const elBootsBuff = document.getElementById('bootsBuff');
+const elBootsTimerText = document.getElementById('bootsTimerText');
+const elSlotDash = document.getElementById('slotDash');
+const elCountDash = document.getElementById('countDash');
+const elMobileDashBadge = document.getElementById('mobileDashBadge');
+const elWaveDisplay = document.getElementById('waveDisplay');
+
+function updateBuffsUI() {
+  if (elShieldBuff) elShieldBuff.classList.toggle('hidden', !hasShield);
+  if (elBootsBuff) {
+    elBootsBuff.classList.toggle('hidden', speedBoostTimer <= 0);
+    if (elBootsTimerText && speedBoostTimer > 0) {
+      elBootsTimerText.textContent = Math.ceil(speedBoostTimer / 1000) + 's';
+    }
+  }
+}
+
+function updateDashUI() {
+  if (elCountDash) {
+    if (dashCooldown <= 0) {
+      elCountDash.textContent = '⚡';
+      if (elSlotDash) elSlotDash.classList.remove('cooldown');
+    } else {
+      elCountDash.textContent = (dashCooldown / 1000).toFixed(1) + 's';
+      if (elSlotDash) elSlotDash.classList.add('cooldown');
+    }
+  }
+  if (elMobileDashBadge) {
+    elMobileDashBadge.textContent = dashCooldown <= 0 ? '⚡' : Math.ceil(dashCooldown / 1000) + 's';
+  }
+}
+
+function updateWaveUI() {
+  if (elWaveDisplay) elWaveDisplay.textContent = `W-${currentWave}`;
+}
 
 // Online DOM refs
 const elViewOnlineMenu = document.getElementById('viewOnlineMenu');
@@ -639,15 +959,28 @@ function startGame() {
     cleanUpDisasterMeshes3D();
   }
 
-  // "Khi chơi đơn không có khẩu súng"
+  // Reset Dash, Buffs & Waves
+  dashCooldown = 0;
+  isDashing = false;
+  dashTimer = 0;
+  hasShield = false;
+  speedBoostTimer = 0;
+  currentWave = 1;
+  waveTimeElapsed = 0;
+  comboCount = 0;
+  meteors = [];
+  meteorTimer = 16000;
+  SoundFX.init();
+
+  // Súng Plasma có sẵn cả trong Chơi Đơn (để dập lửa, phá bom, hạ thiên thạch) và Online!
   if (!isMultiplayer) {
     trapCount = 0;
     mineCount = 0;
-    gunAmmo = 0; // Chơi đơn không có súng và đạn!
+    gunAmmo = 3; // Chơi đơn có 3 viên đạn khởi đầu
   } else {
     trapCount = 1;
     mineCount = 1;
-    gunAmmo = 3; // Chỉ chơi online mới có súng và đạn
+    gunAmmo = 3; // Chỉ chơi online mới có bẫy/mìn
   }
   sinkholeCycleTimer = 0;
 
@@ -658,6 +991,9 @@ function startGame() {
 
   updateHpUI();
   updateInventoryUI();
+  updateBuffsUI();
+  updateDashUI();
+  updateWaveUI();
 
   // Reset Concurrent Disasters
   fireWave = null;
@@ -844,25 +1180,44 @@ function updateInventoryUI() {
   if (mobCountGun) mobCountGun.textContent = 'x' + gunAmmo;
   if (mobCountBomb) mobCountBomb.textContent = 'x' + bombAmmo;
 
-  // In Solo mode: hide traps, mines, and gun slots completely, but keep Bombs!
+  // In Solo mode: hide traps and mines (PvP items), but keep gun and bombs active!
   if (elSlotTrap) elSlotTrap.classList.toggle('hidden', !isMultiplayer);
   if (elSlotMine) elSlotMine.classList.toggle('hidden', !isMultiplayer);
   const elSlotGun = document.getElementById('slotGun');
-  if (elSlotGun) elSlotGun.classList.toggle('hidden', !isMultiplayer);
+  if (elSlotGun) elSlotGun.classList.remove('hidden');
 
   const mobileTrap = document.getElementById('mobileBtnTrap');
   const mobileMine = document.getElementById('mobileBtnMine');
   const mobileShoot = document.getElementById('mobileBtnShoot');
   if (mobileTrap) mobileTrap.classList.toggle('hidden', !isMultiplayer);
   if (mobileMine) mobileMine.classList.toggle('hidden', !isMultiplayer);
-  if (mobileShoot) mobileShoot.classList.toggle('hidden', !isMultiplayer);
+  if (mobileShoot) mobileShoot.classList.remove('hidden');
 }
 
 function takeDamage(amount, reason) {
   if (isSpectator || damageCooldown > 0) return;
 
+  // Invulnerable during Dash
+  if (isDashing) {
+    triggerNearMissBonus('LƯỚT NÉ NGOẠN MỤC!');
+    return;
+  }
+
+  // Absorbed by Energy Shield
+  if (hasShield) {
+    hasShield = false;
+    damageCooldown = 650;
+    updateBuffsUI();
+    SoundFX.shieldBreak();
+    spawnPickupParticles(player.x, player.y, '#00e5ff');
+    spawnFloatingText('🛡️ KHIÊN HẤP THỤ!', player.x, player.y, '#00e5ff');
+    triggerScreenShake(2.0, 140);
+    return;
+  }
+
   hp = Math.max(0, hp - amount);
   damageCooldown = 650;
+  SoundFX.hurt();
 
   updateHpUI();
   spawnDamageParticles(player.x, player.y);
@@ -878,9 +1233,26 @@ function takeDamage(amount, reason) {
 function takeTickDamage(amount, reason, type = 'fire') {
   if (isSpectator) return;
 
+  // Invulnerable during Dash
+  if (isDashing) {
+    triggerNearMissBonus('LƯỚT QUA HIỂM NGUY!');
+    return;
+  }
+
+  // Absorbed by Energy Shield
+  if (hasShield) {
+    hasShield = false;
+    updateBuffsUI();
+    SoundFX.shieldBreak();
+    spawnPickupParticles(player.x, player.y, '#00e5ff');
+    spawnFloatingText('🛡️ KHIÊN HẤP THỤ!', player.x, player.y, '#00e5ff');
+    return;
+  }
+
   hp = Math.max(0, hp - amount);
   playerHurtFlash = 120;
   updateHpUI();
+  SoundFX.hurt();
 
   let label = 'LỬA';
   let color = '#ff6e40';
@@ -901,6 +1273,7 @@ function healHp(amount) {
   hp = Math.min(MAX_HP, hp + amount);
   const actual = hp - prev;
   updateHpUI();
+  SoundFX.pickup('heart');
   spawnFloatingText(`+${actual} HP`, player.x, player.y, '#00e676');
 }
 
@@ -973,8 +1346,7 @@ function showToast(msg) {
 // ══════════════════════════════════════════════
 
 function shootGun(targetX, targetY) {
-  // "Khi chơi đơn không có khẩu súng"
-  if (!isMultiplayer || isSpectator || trapFrozenTimer > 0 || !running || paused) return;
+  if (isSpectator || trapFrozenTimer > 0 || !running || paused) return;
 
   if (gunAmmo <= 0) {
     showToast('Bạn chưa có đạn! Hãy nhặt súng Plasma trên bản đồ.');
@@ -983,6 +1355,7 @@ function shootGun(targetX, targetY) {
 
   gunAmmo--;
   updateInventoryUI();
+  SoundFX.laser();
 
   const startX = player.x * CELL + CELL / 2;
   const startY = player.y * CELL + CELL / 2;
@@ -1019,8 +1392,6 @@ function shootGun(targetX, targetY) {
   });
 
   spawnFloatingText('BẮN!', player.x, player.y, '#ffab40');
-
-  // Subtle gun muzzle flash (No screen shake on gun shoot to prevent text jumping)
 
   if (isMultiplayer) {
     broadcastNetworkMessage({
@@ -1068,6 +1439,7 @@ function updateBullets(dt) {
         spreadingFlames.delete(cellKey);
         spawnSteam(bulletGx, bulletGy);
         spawnFloatingText('DẬP LỬA', bulletGx, bulletGy, '#38bdf8');
+        SoundFX.pickup('shield');
         bullets.splice(i, 1);
         break;
       }
@@ -1075,6 +1447,7 @@ function updateBullets(dt) {
         fireCells.delete(cellKey);
         spawnSteam(bulletGx, bulletGy);
         spawnFloatingText('DẬP LỬA', bulletGx, bulletGy, '#38bdf8');
+        SoundFX.pickup('shield');
         bullets.splice(i, 1);
         break;
       }
@@ -1089,6 +1462,27 @@ function updateBullets(dt) {
             explodeBomb(bm);
             bombs.splice(bi, 1);
             spawnFloatingText('BẮN NỔ BOM!', bm.gx, bm.gy, '#ff9100');
+            bullets.splice(i, 1);
+            break;
+          }
+        }
+      }
+      if (i >= bullets.length || !bullets[i]) break;
+
+      // Check hit on falling meteors
+      for (let mi = meteors.length - 1; mi >= 0; mi--) {
+        const mt = meteors[mi];
+        if (mt && (mt.state === 'falling' || mt.state === 'warning')) {
+          const mPx = mt.x * CELL;
+          const mPy = mt.y * CELL;
+          if (Math.hypot(b.x - mPx, b.y - mPy) < CELL * 1.5) {
+            triggerMeteorImpact(mt);
+            meteors.splice(mi, 1);
+            spawnFloatingText('BẮN VỠ THIÊN THẠCH! +20 XU', mt.gx, mt.gy, '#ffd700');
+            bonusScore += 100;
+            playerCoins += 20;
+            saveShopData();
+            updateCoinDisplays();
             bullets.splice(i, 1);
             break;
           }
@@ -1332,17 +1726,20 @@ function spawnItem() {
   const rand = Math.random();
 
   if (!isMultiplayer) {
-    // "Khi chơi đơn không có khẩu súng" -> Có tim hồi máu, bom quăng và xu!
-    if (rand < 0.45) type = 'heart';
-    else if (rand < 0.75) type = 'bomb';
-    else type = 'coin';
+    if (rand < 0.25) type = 'heart';
+    else if (rand < 0.45) type = 'coin';
+    else if (rand < 0.60) type = 'bomb';
+    else if (rand < 0.75) type = 'gun';
+    else if (rand < 0.88) type = 'shield';
+    else type = 'boots';
   } else {
-    // MULTIPLAYER: hearts, bombs, traps, mines, guns, coins
-    if (rand < 0.22) type = 'heart';
-    else if (rand < 0.40) type = 'bomb';
-    else if (rand < 0.55) type = 'trap';
-    else if (rand < 0.70) type = 'mine';
-    else if (rand < 0.85) type = 'gun';
+    if (rand < 0.18) type = 'heart';
+    else if (rand < 0.30) type = 'bomb';
+    else if (rand < 0.42) type = 'gun';
+    else if (rand < 0.54) type = 'shield';
+    else if (rand < 0.66) type = 'boots';
+    else if (rand < 0.78) type = 'trap';
+    else if (rand < 0.88) type = 'mine';
     else type = 'coin';
   }
 
@@ -1404,26 +1801,43 @@ function collectItem(it) {
     const healAmount = 30 + Math.floor(Math.random() * 21); // 30 đến 50 HP
     healHp(healAmount);
     spawnPickupParticles(it.x, it.y, '#00e676');
+  } else if (it.type === 'shield') {
+    hasShield = true;
+    updateBuffsUI();
+    SoundFX.pickup('shield');
+    spawnFloatingText('🛡️ KHIÊN HỘ THỂ', it.x, it.y, '#00e5ff');
+    spawnPickupParticles(it.x, it.y, '#00e5ff');
+    showToast('🛡️ Đã nhặt Khiên Hộ Thể! Chặn 1 đòn chí mạng tiếp theo.');
+  } else if (it.type === 'boots') {
+    speedBoostTimer = 6000;
+    updateBuffsUI();
+    SoundFX.pickup('boots');
+    spawnFloatingText('⚡ BỨT TỐC (+50%)', it.x, it.y, '#f59e0b');
+    spawnPickupParticles(it.x, it.y, '#f59e0b');
+    showToast('⚡ Bứt Tốc kích hoạt! Tăng tốc độ chạy trong 6s.');
   } else if (it.type === 'trap') {
     trapCount = Math.min(3, trapCount + 1);
     updateInventoryUI();
+    SoundFX.pickup('item');
     spawnFloatingText('+1 BẪY', it.x, it.y, '#ffea00');
     spawnPickupParticles(it.x, it.y, '#ffea00');
   } else if (it.type === 'mine') {
     mineCount = Math.min(3, mineCount + 1);
     updateInventoryUI();
+    SoundFX.pickup('item');
     spawnFloatingText('+1 MÌN', it.x, it.y, '#ff1744');
     spawnPickupParticles(it.x, it.y, '#ff1744');
   } else if (it.type === 'gun') {
-    // GUN: +1 bullet, stackable (no max limit)
     gunAmmo++;
     updateInventoryUI();
+    SoundFX.pickup('gun');
     spawnFloatingText('+1 ĐẠN', it.x, it.y, '#ffab40');
     spawnPickupParticles(it.x, it.y, '#ffab40');
-    showToast(`Nhặt được súng! Đạn: ${gunAmmo} viên (Phím 3/F hoặc click để bắn)`);
+    showToast(`Nhặt được súng! Đạn: ${gunAmmo} viên (Phím 3/Click để bắn)`);
   } else if (it.type === 'bomb') {
     bombAmmo = Math.min(6, bombAmmo + 1);
     updateInventoryUI();
+    SoundFX.pickup('bomb');
     spawnFloatingText('+1 BOM 💣', it.x, it.y, '#f59e0b');
     spawnPickupParticles(it.x, it.y, '#f59e0b');
     showToast(`Nhặt được Bom! Có ${bombAmmo} quả (Phím Mũi tên ngắm, F quăng)`);
@@ -1432,6 +1846,7 @@ function collectItem(it) {
     playerCoins += coinsEarned;
     saveShopData();
     updateCoinDisplays();
+    SoundFX.pickup('coin');
     spawnFloatingText(`+${coinsEarned} XU`, it.x, it.y, '#ffd700');
     spawnPickupParticles(it.x, it.y, '#ffd700');
     showToast(`Nhặt được +${coinsEarned} Xu mua Skin!`);
@@ -2711,6 +3126,8 @@ function loop(now) {
   updateTornado(dt);
   updateLandslide(dt);
   updateBombs(dt);
+  updateMeteors(dt);
+  updateWaveSystem(dt);
   updateFogWeather(dt);
 
   updateWarningBanners();
@@ -2733,34 +3150,215 @@ function loop(now) {
   if (typeof render3D === 'function') render3D(dt);
 }
 
+// ── Mưa Thiên Thạch 3D (Meteor Disaster) ──────
+function updateMeteors(dt) {
+  if (isMultiplayer && !isHost) return;
+
+  meteorTimer -= dt;
+  if (meteorTimer <= 0) {
+    spawnMeteorShower();
+    meteorTimer = 16000 + Math.random() * 8000;
+  }
+
+  for (let i = meteors.length - 1; i >= 0; i--) {
+    const m = meteors[i];
+    m.time += dt;
+
+    if (m.state === 'warning') {
+      if (m.time >= m.warnDuration) {
+        m.state = 'falling';
+        m.time = 0;
+      }
+    } else if (m.state === 'falling') {
+      const progress = Math.min(1, m.time / m.fallDuration);
+      m.curY = 22 * (1 - progress);
+      if (progress >= 1) {
+        m.state = 'impact';
+        m.time = 0;
+        triggerMeteorImpact(m);
+      }
+    } else if (m.state === 'impact') {
+      if (m.time > 400) {
+        meteors.splice(i, 1);
+      }
+    }
+  }
+}
+
+function spawnMeteorShower() {
+  const count = 2 + Math.floor(Math.random() * 2) + Math.min(2, Math.floor(currentWave / 2));
+  showHazardWarning('☄️ CẢNH BÁO: MƯA THIÊN THẠCH RƠI TỪ BẦU TRỜI!', 2500);
+  SoundFX.thunder();
+
+  for (let c = 0; c < count; c++) {
+    const gx = 2 + Math.floor(Math.random() * (GRID - 4));
+    const gy = 2 + Math.floor(Math.random() * (GRID - 4));
+    meteors.push({
+      id: `meteor_${Date.now()}_${c}`,
+      gx: gx,
+      gy: gy,
+      x: gx + 0.5,
+      y: gy + 0.5,
+      state: 'warning',
+      time: 0,
+      warnDuration: 1800 + c * 350,
+      fallDuration: 650,
+      curY: 22
+    });
+  }
+}
+
+function triggerMeteorImpact(m) {
+  SoundFX.explosion();
+  triggerScreenShake(4.5, 300);
+  spawnExplosionParticles(m.gx, m.gy);
+
+  // Leave glowing lava crater for 5.5s
+  craters.push({
+    cells: [{ x: m.gx, y: m.gy }],
+    timeLeft: 5500,
+    flash: 1
+  });
+
+  // Check damage if player caught in impact radius
+  const dist = Math.hypot(player.x - m.x, player.y - m.y);
+  if (dist < 1.9) {
+    takeDamage(42, 'Bị thiên thạch khổng lồ đè bẹp!');
+  } else if (dist < 3.0) {
+    triggerNearMissBonus('NÉ THIÊN THẠCH SUÝT CHẾT!');
+  }
+}
+
+// ── Cấp Độ Sinh Tồn (Wave Progression) ────────
+function updateWaveSystem(dt) {
+  if (!running || paused || isCountingDown || isSpectator) return;
+  waveTimeElapsed += dt;
+  if (waveTimeElapsed >= WAVE_DURATION) {
+    waveTimeElapsed = 0;
+    currentWave++;
+    triggerWaveClear(currentWave);
+  }
+}
+
+function triggerWaveClear(waveNum) {
+  const bonusCoins = 80 + waveNum * 25;
+  const healAmount = 25;
+  playerCoins += bonusCoins;
+  saveShopData();
+  updateCoinDisplays();
+  healHp(healAmount);
+  SoundFX.waveClear();
+
+  updateWaveUI();
+
+  showToast(`🏆 VƯỢT QUA WAVE ${waveNum - 1}! Thưởng +${bonusCoins} Xu · Hồi +${healAmount} HP`, 3500);
+  spawnFloatingText(`WAVE ${waveNum}!`, player.x, player.y - 1, '#c084fc');
+}
+
+// ── Near-Miss Dodge Bonus ─────────────────────
+function triggerNearMissBonus(reason = 'NÉ NGOẠN MỤC!') {
+  const now = performance.now();
+  if (now - lastNearMissTime < 800) return;
+  lastNearMissTime = now;
+  comboCount++;
+  const bonusPts = 50 * Math.min(3, comboCount);
+  bonusScore += bonusPts;
+  SoundFX.nearMiss();
+
+  const comboStr = comboCount > 1 ? ` (x${comboCount} COMBO)` : '';
+  spawnFloatingText(`${reason} +${bonusPts}đ${comboStr}`, player.x, player.y - 0.6, '#ffd700');
+}
+
 // ── Smooth Continuous Movement (Non-Grid) ──────
+function performDash() {
+  if (!running || paused || isCountingDown || isSpectator || trapFrozenTimer > 0) return;
+  if (dashCooldown > 0) return;
+
+  dashCooldown = DASH_COOLDOWN;
+  isDashing = true;
+  dashTimer = DASH_DURATION;
+
+  let dx = dir.x;
+  let dy = dir.y;
+  if (dx === 0 && dy === 0) {
+    if (typeof player.angle === 'number') {
+      dx = Math.cos(player.angle);
+      dy = Math.sin(player.angle);
+    } else {
+      dx = 1; dy = 0;
+    }
+  }
+  const len = Math.hypot(dx, dy) || 1;
+  dashDir = { x: dx / len, y: dy / len };
+
+  SoundFX.dash();
+  triggerScreenShake(2.5, 120);
+  spawnDashGhost3D(player.x, player.y, player.angle);
+  updateDashUI();
+}
+window.performDash = performDash;
+
+function spawnDashGhost3D(gx, gz, angle) {
+  if (!scene3D || typeof buildSurvivor3D !== 'function') return;
+  try {
+    const ghost = buildSurvivor3D(equippedSkinId || 'default', '', false);
+    ghost.root.position.set(gx, 0, gz);
+    if (angle !== undefined) {
+      ghost.root.rotation.y = -angle + Math.PI / 2;
+    }
+    ghost.root.traverse(child => {
+      if (child.isMesh && child.material) {
+        child.material = child.material.clone();
+        child.material.transparent = true;
+        child.material.opacity = 0.55;
+      }
+    });
+    scene3D.add(ghost.root);
+    ghostMeshes3D.push({ root: ghost.root, life: 300, maxLife: 300 });
+  } catch (e) {}
+}
+
 function updateMovement(dt) {
   if (trapFrozenTimer > 0 || isSpectator) return;
+
+  if (dashCooldown > 0) {
+    dashCooldown = Math.max(0, dashCooldown - dt);
+    updateDashUI();
+  }
 
   // Determine directional input from held keyboard keys (WASD / Arrows)
   let inputX = 0;
   let inputY = 0;
 
-  if (keysDown.has('up')) inputY -= 1;
-  if (keysDown.has('down')) inputY += 1;
-  if (keysDown.has('left')) inputX -= 1;
-  if (keysDown.has('right')) inputX += 1;
-
-  if (inputX !== 0 || inputY !== 0) {
-    const len = Math.hypot(inputX, inputY);
-    dir.x = inputX / len;
-    dir.y = inputY / len;
-    nextDir.x = dir.x;
-    nextDir.y = dir.y;
-    player.angle = Math.atan2(dir.y, dir.x);
-  } else if (joystickActive && (dir.x !== 0 || dir.y !== 0)) {
-    // Joystick is currently held active by mobile user
+  if (isDashing) {
+    dashTimer -= dt;
+    if (dashTimer <= 0) isDashing = false;
+    dir.x = dashDir.x;
+    dir.y = dashDir.y;
+    if (Math.random() < 0.45) {
+      spawnDashGhost3D(player.x, player.y, player.angle);
+    }
   } else {
-    // "nhân vật chỉ di chuyển khi điều khiển nút di chuyển" - Nhả phím hoặc buông cần là dừng ngay!
-    dir.x = 0;
-    dir.y = 0;
-    nextDir.x = 0;
-    nextDir.y = 0;
+    if (keysDown.has('up')) inputY -= 1;
+    if (keysDown.has('down')) inputY += 1;
+    if (keysDown.has('left')) inputX -= 1;
+    if (keysDown.has('right')) inputX += 1;
+
+    if (inputX !== 0 || inputY !== 0) {
+      const len = Math.hypot(inputX, inputY);
+      dir.x = inputX / len;
+      dir.y = inputY / len;
+      nextDir.x = dir.x;
+      nextDir.y = dir.y;
+      player.angle = Math.atan2(dir.y, dir.x);
+    } else if (joystickActive && (dir.x !== 0 || dir.y !== 0)) {
+      // Joystick is currently held active by mobile user
+    } else {
+      dir.x = 0;
+      dir.y = 0;
+      nextDir.x = 0;
+      nextDir.y = 0;
+    }
   }
 
   if (dir.x === 0 && dir.y === 0) return;
@@ -2773,6 +3371,17 @@ function updateMovement(dt) {
   if (tornadoSlowTimer > 0) tornadoSlowTimer -= dt;
   const speedMult = tornadoSlowTimer > 0 ? 0.48 : 1.0;
 
+  // Speed boost boots (+50% speed)
+  let bootsMult = 1.0;
+  if (speedBoostTimer > 0) {
+    speedBoostTimer -= dt;
+    bootsMult = 1.5;
+    updateBuffsUI();
+  }
+
+  // Dash multiplier
+  const dashMult = isDashing ? DASH_SPEED_MULT : 1.0;
+
   // Sụt lún: "nếu rơi vào thiên tai sụt lún thì sẽ có lúc đi chậm có lúc đứng yên"
   const curCellKey = `${Math.floor(player.x)},${Math.floor(player.y)}`;
   let sinkholeSpeedMult = 1.0;
@@ -2780,13 +3389,11 @@ function updateMovement(dt) {
     sinkholeCycleTimer += dt;
     const cycle = sinkholeCycleTimer % 2400;
     if (cycle < 1500) {
-      // Có lúc đi chậm: tốc độ giảm còn 30%
       sinkholeSpeedMult = 0.3;
       if (Math.random() < 0.04) {
         spawnFloatingText('LÚN ĐẤT (Đi chậm)', player.x, player.y, '#d7ccc8');
       }
     } else {
-      // Có lúc đứng yên: tốc độ 0% (chôn chân hoàn toàn)
       sinkholeSpeedMult = 0.0;
       if (Math.random() < 0.05) {
         spawnFloatingText('SỤT LÚN (ĐỨNG YÊN)!', player.x, player.y, '#bcaaa4');
@@ -2796,7 +3403,7 @@ function updateMovement(dt) {
     sinkholeCycleTimer = 0;
   }
 
-  const dist = cellSpeed * speedMult * sinkholeSpeedMult * (dt / 1000);
+  const dist = cellSpeed * speedMult * sinkholeSpeedMult * bootsMult * dashMult * (dt / 1000);
 
   // Update floating-point position
   player.x += dir.x * dist;
@@ -4390,6 +4997,233 @@ let rainParticles3D = null;
 let lightningBolt3D = null;
 const tornadoGroups3D = [];
 
+// Procedural stylized texture cache & ambient motes
+let texGrassLight3D = null;
+let texGrassDark3D = null;
+let texMoltenLava3D = null;
+let texRainWater3D = null;
+let texScorched3D = null;
+let texDropShadow3D = null;
+let ambientMotes3D = null;
+let floatingStones3D = [];
+
+function createLushGrassTexture(isDark) {
+  const c = document.createElement('canvas');
+  c.width = 128;
+  c.height = 128;
+  const ctx = c.getContext('2d');
+
+  // Base lush grass gradient
+  const grad = ctx.createLinearGradient(0, 0, 128, 128);
+  if (isDark) {
+    grad.addColorStop(0, '#2b7834');
+    grad.addColorStop(1, '#1b5a23');
+  } else {
+    grad.addColorStop(0, '#43a047');
+    grad.addColorStop(1, '#2e7d32');
+  }
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, 128, 128);
+
+  // Stylized grass blade specks / fine strokes
+  for (let i = 0; i < 90; i++) {
+    const gx = Math.random() * 128;
+    const gy = Math.random() * 128;
+    const len = 3 + Math.random() * 6;
+    const isBright = Math.random() > 0.45;
+    ctx.strokeStyle = isBright
+      ? (isDark ? 'rgba(74, 222, 128, 0.35)' : 'rgba(134, 239, 172, 0.42)')
+      : 'rgba(20, 83, 45, 0.35)';
+    ctx.lineWidth = 1.2 + Math.random() * 0.8;
+    ctx.beginPath();
+    ctx.moveTo(gx, gy);
+    ctx.lineTo(gx + (Math.random() - 0.5) * 2, gy - len);
+    ctx.stroke();
+  }
+
+  // Soft perimeter ambient occlusion bevel for clear voxel tile separation
+  const bevelGrad = ctx.createRadialGradient(64, 64, 46, 64, 64, 68);
+  bevelGrad.addColorStop(0, 'rgba(0, 0, 0, 0)');
+  bevelGrad.addColorStop(1, 'rgba(10, 40, 18, 0.48)');
+  ctx.fillStyle = bevelGrad;
+  ctx.fillRect(0, 0, 128, 128);
+
+  // Subtle center dome highlight
+  const centerHighlight = ctx.createRadialGradient(64, 64, 0, 64, 64, 44);
+  centerHighlight.addColorStop(0, isDark ? 'rgba(134, 239, 172, 0.18)' : 'rgba(187, 247, 208, 0.22)');
+  centerHighlight.addColorStop(1, 'rgba(0, 0, 0, 0)');
+  ctx.fillStyle = centerHighlight;
+  ctx.fillRect(0, 0, 128, 128);
+
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = THREE.ClampToEdgeWrapping;
+  tex.wrapT = THREE.ClampToEdgeWrapping;
+  return tex;
+}
+
+function createMoltenLavaTexture() {
+  const c = document.createElement('canvas');
+  c.width = 128;
+  c.height = 128;
+  const ctx = c.getContext('2d');
+
+  // Base fiery magma core
+  const grad = ctx.createRadialGradient(64, 64, 8, 64, 64, 72);
+  grad.addColorStop(0, '#fffbeb');
+  grad.addColorStop(0.2, '#f59e0b');
+  grad.addColorStop(0.55, '#dc2626');
+  grad.addColorStop(1, '#7f1d1d');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, 128, 128);
+
+  // Cracked obsidian crust plates
+  ctx.fillStyle = '#18110e';
+  for (let i = 0; i < 18; i++) {
+    const cx = 12 + Math.random() * 104;
+    const cy = 12 + Math.random() * 104;
+    const r = 8 + Math.random() * 16;
+    ctx.beginPath();
+    for (let a = 0; a < 6; a++) {
+      const ang = (a / 6) * Math.PI * 2 + Math.random() * 0.3;
+      const dist = r * (0.75 + Math.random() * 0.4);
+      const px = cx + Math.cos(ang) * dist;
+      const py = cy + Math.sin(ang) * dist;
+      if (a === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // Glowing magma crack lines
+  ctx.strokeStyle = '#fef08a';
+  ctx.lineWidth = 1.6;
+  ctx.shadowColor = '#f97316';
+  ctx.shadowBlur = 8;
+  for (let j = 0; j < 8; j++) {
+    ctx.beginPath();
+    ctx.moveTo(Math.random() * 128, Math.random() * 128);
+    ctx.lineTo(Math.random() * 128, Math.random() * 128);
+    ctx.stroke();
+  }
+  ctx.shadowBlur = 0;
+
+  return new THREE.CanvasTexture(c);
+}
+
+function createRainWaterTexture() {
+  const c = document.createElement('canvas');
+  c.width = 128;
+  c.height = 128;
+  const ctx = c.getContext('2d');
+
+  // Tropical aqua water gradient
+  const grad = ctx.createLinearGradient(0, 0, 128, 128);
+  grad.addColorStop(0, '#0284c7');
+  grad.addColorStop(0.5, '#0ea5e9');
+  grad.addColorStop(1, '#0369a1');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, 128, 128);
+
+  // Caustics & soft ripple highlights
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+  ctx.lineWidth = 1.8;
+  for (let i = 0; i < 5; i++) {
+    const rx = 20 + Math.random() * 88;
+    const ry = 20 + Math.random() * 88;
+    ctx.beginPath();
+    ctx.ellipse(rx, ry, 14 + Math.random() * 16, 8 + Math.random() * 10, Math.random() * Math.PI, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  return new THREE.CanvasTexture(c);
+}
+
+function createScorchedTexture() {
+  const c = document.createElement('canvas');
+  c.width = 128;
+  c.height = 128;
+  const ctx = c.getContext('2d');
+
+  ctx.fillStyle = '#1c1512';
+  ctx.fillRect(0, 0, 128, 128);
+
+  for (let i = 0; i < 50; i++) {
+    const sx = Math.random() * 128;
+    const sy = Math.random() * 128;
+    const isEmber = Math.random() > 0.65;
+    ctx.fillStyle = isEmber ? 'rgba(249, 115, 22, 0.7)' : 'rgba(68, 64, 60, 0.7)';
+    ctx.beginPath();
+    ctx.arc(sx, sy, isEmber ? 1.3 : 2.2, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  return new THREE.CanvasTexture(c);
+}
+
+function createSoftContactShadowTexture() {
+  const c = document.createElement('canvas');
+  c.width = 64;
+  c.height = 64;
+  const ctx = c.getContext('2d');
+
+  const grad = ctx.createRadialGradient(32, 32, 4, 32, 32, 30);
+  grad.addColorStop(0, 'rgba(10, 15, 25, 0.65)');
+  grad.addColorStop(0.6, 'rgba(10, 15, 25, 0.28)');
+  grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, 64, 64);
+
+  return new THREE.CanvasTexture(c);
+}
+
+function buildAmbientMotes3D() {
+  const count = 90;
+  const geo = new THREE.BufferGeometry();
+  const positions = new Float32Array(count * 3);
+  const speeds = [];
+
+  for (let i = 0; i < count; i++) {
+    positions[i * 3] = Math.random() * (GRID + 4) - 2;
+    positions[i * 3 + 1] = 0.4 + Math.random() * 5.5;
+    positions[i * 3 + 2] = Math.random() * (GRID + 4) - 2;
+    speeds.push({
+      vy: 0.15 + Math.random() * 0.25,
+      wobbleSpeed: 1.5 + Math.random() * 2.0,
+      phase: Math.random() * Math.PI * 2,
+      baseX: positions[i * 3],
+      baseZ: positions[i * 3 + 2]
+    });
+  }
+
+  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+  const c = document.createElement('canvas');
+  c.width = 32;
+  c.height = 32;
+  const ctx = c.getContext('2d');
+  const g = ctx.createRadialGradient(16, 16, 2, 16, 16, 15);
+  g.addColorStop(0, 'rgba(255, 255, 255, 1)');
+  g.addColorStop(0.35, 'rgba(254, 240, 138, 0.85)');
+  g.addColorStop(1, 'rgba(254, 240, 138, 0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 32, 32);
+  const moteTex = new THREE.CanvasTexture(c);
+
+  const mat = new THREE.PointsMaterial({
+    size: 0.22,
+    map: moteTex,
+    transparent: true,
+    opacity: 0.75,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    color: 0xfef08a
+  });
+
+  const points = new THREE.Points(geo, mat);
+  return { points, speeds, mat };
+}
+
 function getSkinHex(skinId) {
   if (!skinId || skinId === 'default') return 0x00e5ff;
   if (skinId === 'cyber_red') return 0xff1744;
@@ -4464,32 +5298,84 @@ function init3DScene() {
   pointLightBomb3D.position.set(GRID / 2, 2, GRID / 2);
   scene3D.add(pointLightBomb3D);
 
-  // Floating Natural Meadow Island Base (Rich dark soil bedrock - hugs 20x20 grid)
-  const baseGeo = new THREE.BoxGeometry(GRID + 0.35, 0.8, GRID + 0.35);
-  const baseMat = new THREE.MeshStandardMaterial({ color: 0x1c1712, roughness: 0.94, metalness: 0.05 });
-  const baseMesh = new THREE.Mesh(baseGeo, baseMat);
-  baseMesh.position.set(GRID / 2, -0.45, GRID / 2);
-  baseMesh.receiveShadow = true;
-  scene3D.add(baseMesh);
+  // Layered Floating Bedrock Island Base (Humus soil + granite cliff + floating runic stones)
+  const islandGroup = new THREE.Group();
+
+  // Layer 1: Top humus soil rim just below grass tiles
+  const soilGeo = new THREE.BoxGeometry(GRID + 0.3, 0.35, GRID + 0.3);
+  const soilMat = new THREE.MeshStandardMaterial({
+    color: 0x2b1d14,
+    roughness: 0.95,
+    metalness: 0.05
+  });
+  const soilMesh = new THREE.Mesh(soilGeo, soilMat);
+  soilMesh.position.set(GRID / 2, -0.26, GRID / 2);
+  soilMesh.receiveShadow = true;
+  islandGroup.add(soilMesh);
+
+  // Layer 2: Weathered ancient slate / granite cliff bedrock
+  const cliffGeo = new THREE.BoxGeometry(GRID + 0.15, 1.2, GRID + 0.15);
+  const cliffMat = new THREE.MeshStandardMaterial({
+    color: 0x18181b,
+    roughness: 0.9,
+    metalness: 0.1
+  });
+  const cliffMesh = new THREE.Mesh(cliffGeo, cliffMat);
+  cliffMesh.position.set(GRID / 2, -0.95, GRID / 2);
+  cliffMesh.receiveShadow = true;
+  islandGroup.add(cliffMesh);
+
+  // Floating ancient corner stones
+  floatingStones3D = [];
+  const stoneMat = new THREE.MeshStandardMaterial({
+    color: 0x27272a,
+    roughness: 0.85,
+    metalness: 0.15
+  });
+  const cornerCoords = [
+    { x: -0.6, z: -0.6, scale: 0.35, phase: 0 },
+    { x: GRID + 0.6, z: -0.6, scale: 0.38, phase: 1.5 },
+    { x: -0.6, z: GRID + 0.6, scale: 0.4, phase: 3.0 },
+    { x: GRID + 0.6, z: GRID + 0.6, scale: 0.32, phase: 4.5 }
+  ];
+  for (const cc of cornerCoords) {
+    const sGeo = new THREE.DodecahedronGeometry(cc.scale, 0);
+    const sMesh = new THREE.Mesh(sGeo, stoneMat);
+    sMesh.position.set(cc.x, -0.8, cc.z);
+    sMesh.castShadow = true;
+    islandGroup.add(sMesh);
+    floatingStones3D.push({ mesh: sMesh, baseY: -0.8, phase: cc.phase });
+  }
+  scene3D.add(islandGroup);
+
+  // Create High-Definition Procedural Textures
+  texGrassLight3D = createLushGrassTexture(false);
+  texGrassDark3D = createLushGrassTexture(true);
+  texMoltenLava3D = createMoltenLavaTexture();
+  texRainWater3D = createRainWaterTexture();
+  texScorched3D = createScorchedTexture();
+  texDropShadow3D = createSoftContactShadowTexture();
 
   // Lush Nature Meadow & Disaster Materials
   matTileGrassLight3D = new THREE.MeshStandardMaterial({
-    color: 0x3d8b40, // Fresh vibrant meadow green
-    roughness: 0.82,
+    map: texGrassLight3D,
+    roughness: 0.78,
     metalness: 0.04
   });
   matTileGrassDark3D = new THREE.MeshStandardMaterial({
-    color: 0x2e7332, // Deep emerald forest grass
-    roughness: 0.85,
+    map: texGrassDark3D,
+    roughness: 0.82,
     metalness: 0.04
   });
   matTileNormal3D = matTileGrassLight3D;
 
   matTileFire3D = new THREE.MeshStandardMaterial({
-    color: 0xff3d00,
-    emissive: 0xff2200,
-    emissiveIntensity: 2.8,
-    roughness: 0.2
+    map: texMoltenLava3D,
+    color: 0xffffff,
+    emissive: 0xff3700,
+    emissiveMap: texMoltenLava3D,
+    emissiveIntensity: 2.2,
+    roughness: 0.25
   });
   matTileFireWarn3D = new THREE.MeshStandardMaterial({
     color: 0xff1744,
@@ -4498,17 +5384,18 @@ function init3DScene() {
     roughness: 0.25
   });
   matTileScorched3D = new THREE.MeshStandardMaterial({
-    color: 0x1b120a, // Charred ash / burnt soil
+    map: texScorched3D,
     emissive: 0xb45309,
-    emissiveIntensity: 0.7,
+    emissiveIntensity: 0.75,
     roughness: 0.95
   });
   matTileWater3D = new THREE.MeshStandardMaterial({
-    color: 0x0284c7, // Vibrant aquatic rainwater
-    emissive: 0x0369a1,
-    emissiveIntensity: 0.35,
-    roughness: 0.05,
-    metalness: 0.85,
+    map: texRainWater3D,
+    color: 0x38bdf8,
+    emissive: 0x0284c7,
+    emissiveIntensity: 0.45,
+    roughness: 0.08,
+    metalness: 0.8,
     transparent: true,
     opacity: 0.94
   });
@@ -4587,6 +5474,10 @@ function init3DScene() {
     tornadoGroups3D.push(tg);
   }
 
+  // Ambient Atmospheric Motes (Golden pollen / Rain mist / Molten embers)
+  ambientMotes3D = buildAmbientMotes3D();
+  scene3D.add(ambientMotes3D.points);
+
   init3DPointerControls();
   window.addEventListener('resize', resize3D);
   is3DReady = true;
@@ -4656,6 +5547,26 @@ function buildSurvivor3D(skinId, name, isLocal) {
   pack.position.set(0, 0.5, -0.22);
   bodyGroup.add(pack);
 
+  // Twin Thruster Nozzles & Jet Plumes
+  const nozzleGeo = new THREE.CylinderGeometry(0.045, 0.065, 0.1, 8);
+  const nozzleMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.85, roughness: 0.3 });
+  const nozzleL = new THREE.Mesh(nozzleGeo, nozzleMat);
+  nozzleL.position.set(-0.09, 0.3, -0.22);
+  bodyGroup.add(nozzleL);
+  const nozzleR = new THREE.Mesh(nozzleGeo, nozzleMat);
+  nozzleR.position.set(0.09, 0.3, -0.22);
+  bodyGroup.add(nozzleR);
+
+  const plumeGeo = new THREE.ConeGeometry(0.048, 0.16, 6);
+  plumeGeo.rotateX(Math.PI);
+  const plumeMat = new THREE.MeshBasicMaterial({ color: 0x00f0ff });
+  const plumeL = new THREE.Mesh(plumeGeo, plumeMat);
+  plumeL.position.set(-0.09, 0.18, -0.22);
+  bodyGroup.add(plumeL);
+  const plumeR = new THREE.Mesh(plumeGeo, plumeMat);
+  plumeR.position.set(0.09, 0.18, -0.22);
+  bodyGroup.add(plumeR);
+
   // Arms
   const armGeo = new THREE.CylinderGeometry(0.075, 0.07, 0.4, 8);
   const armMat = new THREE.MeshStandardMaterial({ color: primaryHex, metalness: 0.5, roughness: 0.4 });
@@ -4697,6 +5608,22 @@ function buildSurvivor3D(skinId, name, isLocal) {
   bodyGroup.add(rightLegPivot);
 
   root.add(bodyGroup);
+
+  // Soft Ground Contact Shadow Disc
+  let shadowMesh = null;
+  if (texDropShadow3D) {
+    const shadowGeo = new THREE.PlaneGeometry(0.84, 0.84);
+    shadowGeo.rotateX(-Math.PI / 2);
+    const shadowMat = new THREE.MeshBasicMaterial({
+      map: texDropShadow3D,
+      transparent: true,
+      opacity: 0.75,
+      depthWrite: false
+    });
+    shadowMesh = new THREE.Mesh(shadowGeo, shadowMat);
+    shadowMesh.position.y = 0.012;
+    root.add(shadowMesh);
+  }
 
   // Ice Block (when caught in bear trap)
   const iceGeo = new THREE.BoxGeometry(0.9, 1.25, 0.9);
@@ -4759,6 +5686,9 @@ function buildSurvivor3D(skinId, name, isLocal) {
     rightArmPivot,
     leftLegPivot,
     rightLegPivot,
+    plumeL,
+    plumeR,
+    shadowMesh,
     iceMesh,
     hpBg,
     hpFill,
@@ -4907,15 +5837,15 @@ function createGrassTuftGroup3D(gx, gz) {
     metalness: 0.04
   });
 
-  // 3-4 tapered grass blades per tuft
-  const bladeGeo = new THREE.ConeGeometry(0.038, 0.34, 4);
-  bladeGeo.translate(0, 0.17, 0);
+  // 4 tapered grass blades per tuft with natural angles
+  const bladeGeo = new THREE.ConeGeometry(0.038, 0.35, 4);
+  bladeGeo.translate(0, 0.175, 0);
 
   const configs = [
     { dx: -0.1, dz: -0.06, rx: 0.18, rz: -0.22, s: 1.0, mat: matBladeA },
     { dx: 0.08, dz: -0.04, rx: -0.14, rz: 0.25, s: 0.88, mat: matBladeB },
     { dx: -0.04, dz: 0.08, rx: 0.24, rz: 0.12, s: 0.95, mat: matBladeA },
-    { dx: 0.09, dz: 0.07, rx: -0.2, rz: -0.16, s: 0.8, mat: matBladeB }
+    { dx: 0.09, dz: 0.07, rx: -0.2, rz: -0.16, s: 0.82, mat: matBladeB }
   ];
 
   for (const c of configs) {
@@ -4926,17 +5856,56 @@ function createGrassTuftGroup3D(gx, gz) {
     group.add(m);
   }
 
-  // Wildflower on ~16% of grassy tiles
-  if ((gx * 11 + gz * 17) % 6 === 0) {
-    const isDaisy = (gx + gz) % 2 === 0;
+  // Diverse Wildflowers & Smooth River Pebbles
+  const hash = (gx * 31 + gz * 47) % 100;
+  if (hash < 24) {
+    const flowerType = hash % 4;
     const stemMat = new THREE.MeshBasicMaterial({ color: 0x16a34a });
-    const flowerMat = new THREE.MeshBasicMaterial({ color: isDaisy ? 0xffffff : 0xfacc15 });
     const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.38, 5), stemMat);
     stem.position.set(0.02, 0.19, -0.08);
     group.add(stem);
-    const petal = new THREE.Mesh(new THREE.SphereGeometry(0.065, 8, 8), flowerMat);
-    petal.position.set(0.02, 0.38, -0.08);
-    group.add(petal);
+
+    if (flowerType === 0) {
+      // White Daisy with Golden Center
+      const petalMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+      const centerMat = new THREE.MeshBasicMaterial({ color: 0xfacc15 });
+      const petal = new THREE.Mesh(new THREE.SphereGeometry(0.065, 8, 8), petalMat);
+      petal.position.set(0.02, 0.38, -0.08);
+      group.add(petal);
+      const core = new THREE.Mesh(new THREE.SphereGeometry(0.035, 6, 6), centerMat);
+      core.position.set(0.02, 0.41, -0.08);
+      group.add(core);
+    } else if (flowerType === 1) {
+      // Scarlet Poppy with Dark Seed Head
+      const poppyMat = new THREE.MeshBasicMaterial({ color: 0xef4444 });
+      const petal = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 8), poppyMat);
+      petal.position.set(0.02, 0.38, -0.08);
+      group.add(petal);
+      const core = new THREE.Mesh(new THREE.SphereGeometry(0.03, 6, 6), new THREE.MeshBasicMaterial({ color: 0x18181b }));
+      core.position.set(0.02, 0.41, -0.08);
+      group.add(core);
+    } else if (flowerType === 2) {
+      // Golden Buttercup
+      const buttercupMat = new THREE.MeshBasicMaterial({ color: 0xfbbf24 });
+      const petal = new THREE.Mesh(new THREE.SphereGeometry(0.065, 8, 8), buttercupMat);
+      petal.position.set(0.02, 0.38, -0.08);
+      group.add(petal);
+    } else {
+      // Lavender Stalk
+      const lavenderMat = new THREE.MeshBasicMaterial({ color: 0xa855f7 });
+      const bloom = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.045, 0.16, 6), lavenderMat);
+      bloom.position.set(0.02, 0.36, -0.08);
+      group.add(bloom);
+    }
+  } else if (hash > 88) {
+    // Smooth River Pebble
+    const pebbleGeo = new THREE.SphereGeometry(0.07, 7, 6);
+    pebbleGeo.scale(1.2, 0.5, 0.9);
+    const pebbleMat = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.85, metalness: 0.1 });
+    const pebble = new THREE.Mesh(pebbleGeo, pebbleMat);
+    pebble.position.set(-0.12, 0.03, 0.1);
+    pebble.rotation.y = (gx + gz) * 0.7;
+    group.add(pebble);
   }
 
   return group;
@@ -5183,6 +6152,39 @@ function createItemMesh3D(type) {
     const led = new THREE.Mesh(ledGeo, ledMat);
     led.position.y = 0.06;
     group.add(led);
+  } else if (type === 'shield') {
+    // 3D Shield Orb
+    const orbGeo = new THREE.DodecahedronGeometry(0.24, 1);
+    const orbMat = new THREE.MeshStandardMaterial({
+      color: 0x00e5ff,
+      emissive: 0x00b4d8,
+      metalness: 0.8,
+      roughness: 0.2
+    });
+    const orb = new THREE.Mesh(orbGeo, orbMat);
+    group.add(orb);
+
+    const wireMat = new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true, transparent: true, opacity: 0.8 });
+    const wire = new THREE.Mesh(new THREE.IcosahedronGeometry(0.3, 1), wireMat);
+    group.add(wire);
+  } else if (type === 'boots') {
+    // 3D Speed Boots / Winged Shard
+    const wingGeo = new THREE.ConeGeometry(0.18, 0.45, 4);
+    wingGeo.rotateZ(Math.PI / 6);
+    const wingMat = new THREE.MeshStandardMaterial({
+      color: 0xf59e0b,
+      emissive: 0xd97706,
+      metalness: 0.7,
+      roughness: 0.3
+    });
+    const wingL = new THREE.Mesh(wingGeo, wingMat);
+    wingL.position.x = -0.12;
+    group.add(wingL);
+
+    const wingR = new THREE.Mesh(wingGeo, wingMat);
+    wingR.position.x = 0.12;
+    wingR.rotation.y = Math.PI;
+    group.add(wingR);
   } else if (type === 'gun') {
     const chassisGeo = new THREE.BoxGeometry(0.5, 0.2, 0.18);
     const chassisMat = new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.8, roughness: 0.3 });
@@ -5203,6 +6205,30 @@ function createItemMesh3D(type) {
     coin.rotation.x = Math.PI / 4;
     group.add(coin);
   }
+
+  // Luminous ground aura ring beneath pickup
+  let auraColor = 0xffd700;
+  if (type === 'heart') auraColor = 0xef4444;
+  else if (type === 'shield') auraColor = 0x00e5ff;
+  else if (type === 'boots') auraColor = 0xf59e0b;
+  else if (type === 'bomb') auraColor = 0xf59e0b;
+  else if (type === 'gun') auraColor = 0x00e5ff;
+  else if (type === 'trap') auraColor = 0xa855f7;
+  else if (type === 'mine') auraColor = 0xf43f5e;
+
+  const auraGeo = new THREE.RingGeometry(0.24, 0.38, 24);
+  auraGeo.rotateX(-Math.PI / 2);
+  const auraMat = new THREE.MeshBasicMaterial({
+    color: auraColor,
+    side: THREE.DoubleSide,
+    transparent: true,
+    opacity: 0.65,
+    depthWrite: false
+  });
+  const auraRing = new THREE.Mesh(auraGeo, auraMat);
+  auraRing.position.y = -0.42;
+  group.add(auraRing);
+  group.auraRing = auraRing;
 
   group.position.y = 0.45;
   return group;
@@ -5355,9 +6381,10 @@ function render3D(dt) {
           tuft.visible = false;
         } else {
           tuft.visible = true;
-          const time = performance.now();
-          tuft.rotation.z = Math.sin(time * 0.0025 + x * 0.6 + z * 0.5) * 0.12;
-          tuft.rotation.x = Math.cos(time * 0.002 + x * 0.4 + z * 0.7) * 0.09;
+          const time = performance.now() * 0.0025;
+          const windWave = Math.sin(time + (x + z) * 0.45);
+          tuft.rotation.z = windWave * 0.16;
+          tuft.rotation.x = Math.cos(time * 0.8 + (x - z) * 0.3) * 0.1;
         }
       }
     }
@@ -5386,6 +6413,22 @@ function render3D(dt) {
       localSurvivor3D.bodyGroup.position.y = Math.sin(performance.now() * 0.003) * 0.02;
     }
 
+    // Jetpack Thruster Animation
+    if (localSurvivor3D.plumeL && localSurvivor3D.plumeR) {
+      if (isMoving) {
+        const sc = 0.8 + Math.random() * 0.5;
+        localSurvivor3D.plumeL.scale.set(sc, sc * 1.4, sc);
+        localSurvivor3D.plumeR.scale.set(sc, sc * 1.4, sc);
+        localSurvivor3D.plumeL.visible = true;
+        localSurvivor3D.plumeR.visible = true;
+      } else {
+        localSurvivor3D.plumeL.scale.set(0.35, 0.35, 0.35);
+        localSurvivor3D.plumeR.scale.set(0.35, 0.35, 0.35);
+        localSurvivor3D.plumeL.visible = Math.sin(performance.now() * 0.006) > 0;
+        localSurvivor3D.plumeR.visible = localSurvivor3D.plumeL.visible;
+      }
+    }
+
     if (damageCooldown > 1200 || playerHurtFlash > 0) {
       localSurvivor3D.torsoMat.emissive.setHex(0xff1744);
     } else {
@@ -5402,6 +6445,31 @@ function render3D(dt) {
     else localSurvivor3D.hpFillMat.color.setHex(0xff1744);
 
     localSurvivor3D.root.visible = running && (!isMultiplayer || (!isSpectator && hp > 0));
+
+    // 3D Energy Shield Forcefield
+    if (hasShield) {
+      if (!localSurvivor3D.shieldSphere) {
+        const sGeo = new THREE.IcosahedronGeometry(0.75, 2);
+        const sMat = new THREE.MeshStandardMaterial({
+          color: 0x00e5ff,
+          emissive: 0x00b4d8,
+          wireframe: true,
+          transparent: true,
+          opacity: 0.7
+        });
+        localSurvivor3D.shieldSphere = new THREE.Mesh(sGeo, sMat);
+        localSurvivor3D.root.add(localSurvivor3D.shieldSphere);
+      }
+      localSurvivor3D.shieldSphere.visible = true;
+      localSurvivor3D.shieldSphere.rotation.y += dt * 0.003;
+      localSurvivor3D.shieldSphere.rotation.x += dt * 0.002;
+      const sPulse = 1 + Math.sin(performance.now() * 0.008) * 0.06;
+      localSurvivor3D.shieldSphere.scale.set(sPulse, sPulse, sPulse);
+    } else {
+      if (localSurvivor3D.shieldSphere) {
+        localSurvivor3D.shieldSphere.visible = false;
+      }
+    }
   }
 
   // 4. Update Remote Survivors (Multiplayer)
@@ -5458,6 +6526,19 @@ function render3D(dt) {
         rem.leftArmPivot.rotation.x = 0;
         rem.rightArmPivot.rotation.x = 0;
         rem.bodyGroup.position.y = Math.sin(performance.now() * 0.003 + rp.slot) * 0.02;
+      }
+
+      if (rem.plumeL && rem.plumeR) {
+        if (isRemMoving) {
+          const sc = 0.8 + Math.random() * 0.5;
+          rem.plumeL.scale.set(sc, sc * 1.4, sc);
+          rem.plumeR.scale.set(sc, sc * 1.4, sc);
+          rem.plumeL.visible = true;
+          rem.plumeR.visible = true;
+        } else {
+          rem.plumeL.visible = false;
+          rem.plumeR.visible = false;
+        }
       }
 
       const isPlayerAlive = rp.isAlive !== false && (rp.hp === undefined || rp.hp > 0);
@@ -5796,7 +6877,7 @@ function render3D(dt) {
     }
   }
 
-  // 8. Update Items (Pickups)
+  // 8. Update Items (Pickups) with bobbing and glowing ground aura rings
   const activeItemIndices = new Set();
   for (let i = 0; i < items.length; i++) {
     const it = items[i];
@@ -5811,11 +6892,160 @@ function render3D(dt) {
     im.position.z = it.y;
     im.position.y = 0.45 + Math.sin(performance.now() * 0.005 + it.x) * 0.12;
     im.rotation.y += dt * 0.003;
+    if (im.auraRing) {
+      im.auraRing.scale.setScalar(1 + Math.sin(performance.now() * 0.006 + it.x) * 0.15);
+    }
   }
   for (const [idx, im] of itemMeshes3D.entries()) {
     if (!activeItemIndices.has(idx)) {
       scene3D.remove(im);
       itemMeshes3D.delete(idx);
+    }
+  }
+
+  // 9. Ambient Motes & Floating Bedrock Stones
+  if (ambientMotes3D) {
+    const pos = ambientMotes3D.points.geometry.attributes.position.array;
+    const speeds = ambientMotes3D.speeds;
+    const time = performance.now() * 0.001;
+    const isFire = (fireWave && fireWave.state === 'sweeping') || fireCells.size > 0;
+    const isStorm = !!thunderstorm;
+
+    if (isFire) {
+      ambientMotes3D.mat.color.setHex(0xff6b00); // Glowing volcanic embers
+      ambientMotes3D.mat.opacity = 0.85;
+    } else if (isStorm) {
+      ambientMotes3D.mat.color.setHex(0x93c5fd); // Storm mist
+      ambientMotes3D.mat.opacity = 0.55;
+    } else {
+      ambientMotes3D.mat.color.setHex(0xfef08a); // Golden dandelion pollen
+      ambientMotes3D.mat.opacity = 0.75;
+    }
+
+    for (let i = 0; i < speeds.length; i++) {
+      const idx = i * 3;
+      pos[idx + 1] += speeds[i].vy * (dt / 1000);
+      pos[idx] = speeds[i].baseX + Math.sin(time * speeds[i].wobbleSpeed + speeds[i].phase) * 0.45;
+      pos[idx + 2] = speeds[i].baseZ + Math.cos(time * speeds[i].wobbleSpeed + speeds[i].phase) * 0.45;
+
+      if (pos[idx + 1] > 6.0) {
+        pos[idx + 1] = 0.4;
+      }
+    }
+    ambientMotes3D.points.geometry.attributes.position.needsUpdate = true;
+  }
+
+  if (floatingStones3D && floatingStones3D.length > 0) {
+    const time = performance.now() * 0.002;
+    for (const fs of floatingStones3D) {
+      fs.mesh.position.y = fs.baseY + Math.sin(time + fs.phase) * 0.08;
+      fs.mesh.rotation.y += dt * 0.001;
+    }
+  }
+
+  // 10. Update 3D Laser Bullets
+  const activeBulletIds = new Set();
+  for (let i = 0; i < bullets.length; i++) {
+    const b = bullets[i];
+    const bId = `bullet_${i}_${b.ownerSlot}`;
+    activeBulletIds.add(bId);
+    let bMesh = bulletMeshes3D.get(bId);
+    if (!bMesh) {
+      const bGeo = new THREE.CylinderGeometry(0.06, 0.06, 0.45, 8);
+      bGeo.rotateX(Math.PI / 2);
+      const bMat = new THREE.MeshBasicMaterial({ color: 0xffab40 });
+      const mesh = new THREE.Mesh(bGeo, bMat);
+      const pLight = new THREE.PointLight(0xff9100, 1.2, 3);
+      mesh.add(pLight);
+      scene3D.add(mesh);
+      bMesh = mesh;
+      bulletMeshes3D.set(bId, bMesh);
+    }
+    bMesh.position.set(b.x / CELL, 0.45, b.y / CELL);
+    const ang = Math.atan2(b.vx, b.vy);
+    bMesh.rotation.y = ang;
+    bMesh.visible = true;
+  }
+  for (const [id, bm] of bulletMeshes3D.entries()) {
+    if (!activeBulletIds.has(id)) {
+      scene3D.remove(bm);
+      bulletMeshes3D.delete(id);
+    }
+  }
+
+  // 11. Update 3D Meteors
+  const activeMeteorIds = new Set();
+  for (let i = 0; i < meteors.length; i++) {
+    const m = meteors[i];
+    activeMeteorIds.add(m.id);
+    let mObj = meteorMeshes3D.get(m.id);
+    if (!mObj) {
+      const group = new THREE.Group();
+      const ringGeo = new THREE.RingGeometry(1.3, 1.6, 32);
+      ringGeo.rotateX(-Math.PI / 2);
+      const ringMat = new THREE.MeshBasicMaterial({
+        color: 0xff1744,
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0.8
+      });
+      const ringMesh = new THREE.Mesh(ringGeo, ringMat);
+      ringMesh.position.y = 0.04;
+      group.add(ringMesh);
+
+      const rockGeo = new THREE.DodecahedronGeometry(0.55, 1);
+      const rockMat = new THREE.MeshStandardMaterial({
+        color: 0xef4444,
+        emissive: 0xff3d00,
+        roughness: 0.6,
+        metalness: 0.3
+      });
+      const rockMesh = new THREE.Mesh(rockGeo, rockMat);
+      rockMesh.position.y = 22;
+      group.add(rockMesh);
+
+      const pLight = new THREE.PointLight(0xff3d00, 2, 8);
+      rockMesh.add(pLight);
+
+      scene3D.add(group);
+      mObj = { group, ringMesh, rockMesh };
+      meteorMeshes3D.set(m.id, mObj);
+    }
+
+    mObj.group.position.set(m.x, 0, m.y);
+    if (m.state === 'warning') {
+      mObj.ringMesh.visible = true;
+      mObj.rockMesh.visible = false;
+      mObj.ringMesh.scale.setScalar(1 + Math.sin(performance.now() * 0.02) * 0.2);
+    } else if (m.state === 'falling') {
+      mObj.ringMesh.visible = true;
+      mObj.rockMesh.visible = true;
+      mObj.rockMesh.position.y = m.curY;
+      mObj.rockMesh.rotation.x += dt * 0.01;
+      mObj.rockMesh.rotation.y += dt * 0.015;
+    } else {
+      mObj.group.visible = false;
+    }
+  }
+  for (const [id, mObj] of meteorMeshes3D.entries()) {
+    if (!activeMeteorIds.has(id)) {
+      scene3D.remove(mObj.group);
+      meteorMeshes3D.delete(id);
+    }
+  }
+
+  // 12. Fade and clean up 3D Dash Ghosts
+  for (let i = ghostMeshes3D.length - 1; i >= 0; i--) {
+    const gh = ghostMeshes3D[i];
+    gh.life -= dt;
+    if (gh.life <= 0) {
+      scene3D.remove(gh.root);
+      ghostMeshes3D.splice(i, 1);
+    } else {
+      const op = (gh.life / gh.maxLife) * 0.55;
+      gh.root.traverse(child => {
+        if (child.isMesh && child.material) child.material.opacity = op;
+      });
     }
   }
 
@@ -5826,14 +7056,196 @@ function render3D(dt) {
 // Gọi khởi tạo 3D Engine
 if (typeof THREE !== 'undefined') {
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init3DScene);
+    document.addEventListener('DOMContentLoaded', () => {
+      init3DScene();
+      initHeroPreview3D();
+    });
   } else {
     init3DScene();
+    initHeroPreview3D();
+  }
+}
+
+// ══════════════════════════════════════════════
+//  3D HERO PREVIEW (Menu Showcase Stage)
+// ══════════════════════════════════════════════
+let heroPreviewRenderer = null;
+let heroPreviewScene = null;
+let heroPreviewCamera = null;
+let heroPreviewModel = null;
+let heroPreviewPedestal = null;
+let heroPreviewRings = [];
+let heroPreviewRunning = false;
+let heroPreviewRot = 0;
+let heroPreviewTargetRot = 0;
+let isDraggingHero = false;
+let heroDragStartX = 0;
+
+function initHeroPreview3D() {
+  const canvas = document.getElementById('heroPreviewCanvas');
+  if (!canvas || typeof THREE === 'undefined') return;
+
+  const stage = canvas.parentElement;
+  const width = (stage && stage.clientWidth) || 480;
+  const height = (stage && stage.clientHeight) || 205;
+
+  heroPreviewScene = new THREE.Scene();
+  heroPreviewCamera = new THREE.PerspectiveCamera(35, width / height, 0.1, 100);
+  heroPreviewCamera.position.set(0, 1.25, 4.2);
+  heroPreviewCamera.lookAt(0, 0.65, 0);
+
+  heroPreviewRenderer = new THREE.WebGLRenderer({
+    canvas: canvas,
+    alpha: true,
+    antialias: true
+  });
+  heroPreviewRenderer.setSize(width, height);
+  heroPreviewRenderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+
+  // Lighting
+  const ambLight = new THREE.AmbientLight(0x7dd3fc, 1.3);
+  heroPreviewScene.add(ambLight);
+
+  const keyLight = new THREE.DirectionalLight(0xfffaed, 2.2);
+  keyLight.position.set(3, 5, 4);
+  heroPreviewScene.add(keyLight);
+
+  const rimLight = new THREE.DirectionalLight(0x00e5ff, 1.8);
+  rimLight.position.set(-3, 3, -3);
+  heroPreviewScene.add(rimLight);
+
+  const botLight = new THREE.PointLight(0x00e5ff, 2.5, 6);
+  botLight.position.set(0, 0.2, 0);
+  heroPreviewScene.add(botLight);
+
+  // Holographic Cyber Pedestal
+  const pedGeo = new THREE.CylinderGeometry(1.2, 1.35, 0.22, 32);
+  const pedMat = new THREE.MeshStandardMaterial({
+    color: 0x0f172a,
+    metalness: 0.85,
+    roughness: 0.25
+  });
+  heroPreviewPedestal = new THREE.Mesh(pedGeo, pedMat);
+  heroPreviewPedestal.position.y = -0.11;
+  heroPreviewScene.add(heroPreviewPedestal);
+
+  // Concentric neon rings
+  heroPreviewRings = [];
+  for (let r = 0; r < 2; r++) {
+    const ringGeo = new THREE.RingGeometry(1.22 + r * 0.16, 1.25 + r * 0.16, 40);
+    ringGeo.rotateX(-Math.PI / 2);
+    const ringMat = new THREE.MeshBasicMaterial({
+      color: r === 0 ? 0x00e5ff : 0xf59e0b,
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: 0.85
+    });
+    const ringMesh = new THREE.Mesh(ringGeo, ringMat);
+    ringMesh.position.y = -0.05 + r * 0.03;
+    heroPreviewScene.add(ringMesh);
+    heroPreviewRings.push(ringMesh);
+  }
+
+  // Floating Cyber Particles
+  const partCount = 35;
+  const partGeo = new THREE.BufferGeometry();
+  const partPos = new Float32Array(partCount * 3);
+  for (let i = 0; i < partCount * 3; i += 3) {
+    partPos[i] = (Math.random() - 0.5) * 3.5;
+    partPos[i + 1] = Math.random() * 2.2;
+    partPos[i + 2] = (Math.random() - 0.5) * 2.5;
+  }
+  partGeo.setAttribute('position', new THREE.BufferAttribute(partPos, 3));
+  const partMat = new THREE.PointsMaterial({
+    size: 0.055,
+    color: 0x00f0ff,
+    transparent: true,
+    opacity: 0.75,
+    blending: THREE.AdditiveBlending
+  });
+  const previewMotes = new THREE.Points(partGeo, partMat);
+  heroPreviewScene.add(previewMotes);
+
+  updateHeroPreviewModel();
+
+  if (stage) {
+    stage.addEventListener('pointerdown', (e) => {
+      isDraggingHero = true;
+      heroDragStartX = e.clientX;
+    });
+    window.addEventListener('pointerup', () => { isDraggingHero = false; });
+    window.addEventListener('pointermove', (e) => {
+      if (isDraggingHero) {
+        const dx = e.clientX - heroDragStartX;
+        heroPreviewTargetRot += dx * 0.015;
+        heroDragStartX = e.clientX;
+      }
+    });
+    stage.addEventListener('pointermove', (e) => {
+      if (!isDraggingHero) {
+        const rect = stage.getBoundingClientRect();
+        const nx = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+        heroPreviewCamera.position.x = nx * 0.45;
+        heroPreviewCamera.lookAt(0, 0.65, 0);
+      }
+    });
+  }
+
+  let lastPrevTime = performance.now();
+  function previewLoop(now) {
+    if (elOverStart && elOverStart.classList.contains('hidden')) {
+      heroPreviewRunning = false;
+      return;
+    }
+    heroPreviewRunning = true;
+    requestAnimationFrame(previewLoop);
+    const dt = Math.min(now - lastPrevTime, 40);
+    lastPrevTime = now;
+
+    if (!isDraggingHero) {
+      heroPreviewTargetRot += dt * 0.0009;
+    }
+    heroPreviewRot = THREE.MathUtils.lerp(heroPreviewRot, heroPreviewTargetRot, 0.12);
+
+    if (heroPreviewModel) {
+      heroPreviewModel.root.rotation.y = heroPreviewRot;
+      heroPreviewModel.root.position.y = Math.sin(now * 0.003) * 0.035;
+    }
+
+    heroPreviewRings.forEach((rg, idx) => {
+      rg.rotation.y += (idx === 0 ? 0.008 : -0.006) * (dt / 16);
+    });
+
+    const posArr = partGeo.attributes.position.array;
+    for (let i = 1; i < posArr.length; i += 3) {
+      posArr[i] += 0.006 * (dt / 16);
+      if (posArr[i] > 2.5) posArr[i] = 0;
+    }
+    partGeo.attributes.position.needsUpdate = true;
+
+    heroPreviewRenderer.render(heroPreviewScene, heroPreviewCamera);
+  }
+  requestAnimationFrame(previewLoop);
+}
+
+function updateHeroPreviewModel() {
+  if (!heroPreviewScene || typeof buildSurvivor3D !== 'function') return;
+  if (heroPreviewModel) {
+    heroPreviewScene.remove(heroPreviewModel.root);
+  }
+  heroPreviewModel = buildSurvivor3D(equippedSkinId || 'default', 'Bạn', true);
+  heroPreviewModel.root.position.set(0, 0.05, 0);
+  heroPreviewModel.root.scale.setScalar(1.22);
+  heroPreviewScene.add(heroPreviewModel.root);
+}
+
+function resumeHeroPreview3D() {
+  if (!heroPreviewRunning) {
+    initHeroPreview3D();
   }
 }
 
 // ── Controls: PC Di chuyển khi nhấn giữ, nhả ra là đứng yên ──
-// "nếu pc di chuyển nút a s d w còn khi điều khiển chỗ ném bom di chuyển nút mũi tên trái lên xuốn phải + bấm nút f để thả"
 function getMovementDirName(e) {
   const code = e.code;
   if (code === 'KeyW') return 'up';
@@ -5866,7 +7278,7 @@ document.addEventListener('keydown', e => {
     return;
   }
 
-  // Điều khiển ngắm Quăng Bom bằng phím mũi tên ("chỗ ném bom di chuyển nút mũi tên trái lên xuốn phải")
+  // Điều khiển ngắm Quăng Bom bằng phím mũi tên
   if (e.code === 'ArrowUp' || e.key === 'ArrowUp') {
     e.preventDefault();
     aimKeysDown.add('aim_up');
@@ -5888,10 +7300,17 @@ document.addEventListener('keydown', e => {
     return;
   }
 
-  // Phím F: Quăng Bom ("+ bấm nút f để thả")
+  // Phím F: Quăng Bom
   if (e.code === 'KeyF' || e.key === 'f' || e.key === 'F') {
     e.preventDefault();
     if (running && !paused) throwBomb();
+    return;
+  }
+
+  // Phím Shift hoặc Space: Tốc Biến / Dash né chiêu
+  if (e.key === 'Shift' || e.code === 'ShiftLeft' || e.code === 'ShiftRight' || e.key === ' ' || e.code === 'Space') {
+    e.preventDefault();
+    if (running && !paused) performDash();
     return;
   }
 
@@ -5907,8 +7326,8 @@ document.addEventListener('keydown', e => {
     return;
   }
 
-  // Key 3, J, or Space: Shoot Gun
-  if (e.key === '3' || e.code === 'Digit3' || e.key === 'j' || e.key === 'J' || e.key === ' ' || e.code === 'Space') {
+  // Key 3 or J: Bắn súng
+  if (e.key === '3' || e.code === 'Digit3' || e.key === 'j' || e.key === 'J') {
     e.preventDefault();
     if (running && !paused) shootGun();
     return;
@@ -6685,6 +8104,21 @@ function cleanUpDisasterMeshes3D() {
   if (typeof shockwaveMeshes3D !== 'undefined') {
     for (const [idx, sm] of shockwaveMeshes3D.entries()) scene3D.remove(sm.mesh);
     shockwaveMeshes3D.clear();
+  }
+  if (typeof bulletMeshes3D !== 'undefined') {
+    for (const [id, bm] of bulletMeshes3D.entries()) scene3D.remove(bm);
+    bulletMeshes3D.clear();
+  }
+  if (typeof meteorMeshes3D !== 'undefined') {
+    for (const [id, mm] of meteorMeshes3D.entries()) scene3D.remove(mm.group);
+    meteorMeshes3D.clear();
+  }
+  if (typeof ghostMeshes3D !== 'undefined') {
+    for (const gh of ghostMeshes3D) scene3D.remove(gh.root);
+    ghostMeshes3D = [];
+  }
+  if (typeof localSurvivor3D !== 'undefined' && localSurvivor3D && localSurvivor3D.shieldSphere) {
+    localSurvivor3D.shieldSphere.visible = false;
   }
   if (typeof grassTufts3D !== 'undefined') {
     for (let x = 0; x < GRID; x++) {

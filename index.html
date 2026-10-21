@@ -57,6 +57,15 @@
           <span class="score-value coins" id="coinDisplay">0</span>
         </div>
         <div class="score-divider"></div>
+        <div class="score-item wave-display">
+          <span class="score-label">Đợt</span>
+          <span class="score-value wave-val" id="waveDisplay">W-1</span>
+        </div>
+        <div class="score-divider"></div>
+        <button class="btn-header-sound" id="btnSoundToggle" onclick="toggleSound()" title="Bật/Tắt âm thanh">
+          <span id="soundIcon">🔊</span>
+        </button>
+        <div class="score-divider"></div>
         <button class="btn-header-exit" id="btnHeaderExit" onclick="exitToMainMenu()" title="Thoát ra Menu chính (ESC)">
           <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2">
             <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/>
@@ -114,8 +123,30 @@
         <span class="hp-text" id="hpText">100/100 HP</span>
       </div>
 
-      <!-- Inventory: Trap (1), Landmine (2), Gun (3) -->
+      <!-- Active Buff Badges (Shield, Speed Boots, etc.) -->
+      <div class="status-buffs" id="statusBuffs">
+        <div class="buff-badge shield-buff hidden" id="shieldBuff" title="Khiên Hộ Thể Đang Bật (Chặn 1 đòn chí mạng)">
+          <span class="buff-icon">🛡️</span>
+          <span class="buff-label">KHIÊN BẢO HỘ</span>
+        </div>
+        <div class="buff-badge boots-buff hidden" id="bootsBuff" title="Bứt Tốc Đang Bật (+50% Tốc Độ)">
+          <span class="buff-icon">⚡</span>
+          <span class="buff-label">BỨT TỐC</span>
+          <span class="buff-timer" id="bootsTimerText">5s</span>
+        </div>
+      </div>
+
+      <!-- Inventory: Dash (Shift), Trap (1), Landmine (2), Bomb (F), Gun (3) -->
       <div class="inventory-bar">
+        <button class="inv-slot dash-slot" id="slotDash" onclick="performDash()" title="Nhấn Shift hoặc Space để LƯỚT NÉ CHIÊU">
+          <span class="slot-key">SHIFT</span>
+          <span class="slot-icon">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#00e5ff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" fill="rgba(0,229,255,0.2)"/>
+            </svg>
+          </span>
+          <span class="slot-count" id="countDash">⚡</span>
+        </button>
         <button class="inv-slot" id="slotTrap" onclick="deployTrap()" title="Nhấn phím 1 để thả Bẫy kẹp">
           <span class="slot-key">1</span>
           <span class="slot-icon">
@@ -148,7 +179,7 @@
           </span>
           <span class="slot-count" id="countBomb">x3</span>
         </button>
-        <button class="inv-slot gun-slot" id="slotGun" onclick="shootGun()" title="Nhấn phím 3, Space hoặc click để bắn">
+        <button class="inv-slot gun-slot" id="slotGun" onclick="shootGun()" title="Nhấn phím 3, Click chuột hoặc chạm để bắn">
           <span class="slot-key">3</span>
           <span class="slot-icon">
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#ff9100" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -185,31 +216,35 @@
       <div class="overlay" id="overlayStart">
         <div class="overlay-content start-screen">
           <div class="start-hero">
-            <div class="start-hero-banner">
-              <img src="assets/disaster_hero_art.jpg" alt="Chạy Ngay Đi — Thoát Khỏi Thiên Tai 3D" class="hero-art-img" />
-              <div class="hero-art-overlay">
-                <span class="hero-chip-badge">🔥 BẢN NÂNG CẤP 3D · QUĂNG BOM</span>
+            <div class="start-hero-3d-stage" id="hero3dStage" title="Rê chuột hoặc kéo để xoay nhân vật 360°">
+              <canvas id="heroPreviewCanvas"></canvas>
+              <div class="hero-stage-overlay">
+                <span class="hero-chip-badge">⚡ THREE.JS 3D SURVIVAL · ĐỒ HỌA THUẦN</span>
+                <span class="hero-rot-hint">
+                  <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9"/></svg>
+                  <span>Xoay 360°</span>
+                </span>
               </div>
             </div>
             <h1 class="overlay-title">Chạy Ngay Đi</h1>
-            <p class="overlay-sub">Di chuyển 360° 3D cực mượt, sinh tồn 100 HP né tránh thiên tai dồn dập:<br>Lốc xoáy tản rộng, quăng bom nổ tung, sấm sét và núi lửa!</p>
+            <p class="overlay-sub">Di chuyển 360° 3D cực mượt, sinh tồn 100 HP né tránh thiên tai dồn dập:<br>Lốc xoáy, mưa thiên thạch, quăng bom nổ tung, sấm sét và biển lửa!</p>
           </div>
           <div class="hazard-info">
             <span class="hazard-tag heart">
               <svg viewBox="0 0 16 16" width="13" height="13" fill="#ef4444"><path d="M8 14.5l-1-0.9C3.6 10.4 1.3 8.3 1.3 5.7 1.3 3.6 2.9 2 5 2c1.2 0 2.3.6 3 1.5C8.7 2.6 9.8 2 11 2c2.1 0 3.7 1.6 3.7 3.7 0 2.6-2.3 4.7-5.7 7.9L8 14.5z"/></svg>
               Hồi Máu (+30-50 HP)
             </span>
-            <span class="hazard-tag gun-tag">
-              <svg viewBox="0 0 16 16" width="13" height="13" fill="#f59e0b"><path d="M2 7h7l2-2h3v4h-1.5l-1 1.5H6V14H4V9H2z"/></svg>
-              Súng Plasma (Tích Đạn)
+            <span class="hazard-tag shield-tag">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#00e5ff" stroke-width="2.2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" fill="rgba(0,229,255,0.2)"/></svg>
+              Khiên Hộ Thể (Chặn 1 Đòn)
             </span>
-            <span class="hazard-tag tornado">
-              <svg viewBox="0 0 16 16" width="13" height="13" fill="#94a3b8"><path d="M2 3h12M4 6h8M5 9h6M7 12h2M7.5 14h1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-              Lốc Xoáy Tản Rộng
+            <span class="hazard-tag dash-tag">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#eab308" stroke-width="2.2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" fill="rgba(234,179,8,0.2)"/></svg>
+              Tốc Biến (Lướt Né Chiêu)
             </span>
-            <span class="hazard-tag landmine">
-              <svg viewBox="0 0 16 16" width="13" height="13" fill="#fb7185"><rect x="2" y="8" width="12" height="5" rx="2.5"/><circle cx="8" cy="5" r="1.5"/></svg>
-              Bom Nổ Phân Tán
+            <span class="hazard-tag meteor-tag">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#f97316" stroke-width="2.2"><path d="M12 2l3 5 6 .5-4.5 4 1.5 6-6-3.5L6 17.5 7.5 11.5 3 7.5 9 7z" fill="rgba(249,115,22,0.2)"/></svg>
+              Mưa Thiên Thạch 3D
             </span>
           </div>
 
@@ -477,6 +512,12 @@
       <!-- Right: Circular Action Buttons -->
       <div class="actions-dock" id="actionsDock">
         <div class="secondary-actions-row">
+          <!-- Lướt Dash Circle -->
+          <button class="circle-btn dash-btn" id="mobileBtnDash" onclick="performDash()" title="Lướt né chiêu (Shift / Space)">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#00e5ff" stroke-width="2.2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" fill="rgba(0,229,255,0.2)"/></svg>
+            <span class="circle-badge cyan-badge" id="mobileDashBadge">⚡</span>
+            <span class="btn-subtext">LƯỚT</span>
+          </button>
           <!-- Bẫy Circle -->
           <button class="circle-btn trap-btn" id="mobileBtnTrap" onclick="deployTrap()" title="Đặt Bẫy kẹp">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#ffea00" stroke-width="2.2"><path d="M4 19h16M6 19V9l6 7 6-7v10"/><circle cx="12" cy="15" r="1.5" fill="#ffea00"/></svg>
@@ -507,11 +548,11 @@
 
     <!-- Footer -->
     <footer class="game-footer">
-      <span><kbd>WASD</kbd> di chuyển (nhả ra dừng) · <kbd>Mũi tên</kbd> ngắm ném bom · <kbd>F</kbd> quăng bom · <kbd>Space</kbd>/Click bắn · <kbd>P</kbd> tạm dừng · <kbd>ESC</kbd> thoát</span>
+      <span><kbd>WASD</kbd> di chuyển · <kbd>Shift</kbd>/<kbd>Space</kbd> Lướt né chiêu · <kbd>Click/3</kbd> Bắn súng · <kbd>F</kbd> Quăng bom · <kbd>P</kbd> Tạm dừng · <kbd>ESC</kbd> Thoát</span>
       <span class="pause-indicator hidden" id="pauseIndicator">ĐÃ TẠM DỪNG</span>
     </footer>
   </div>
 
-  <script src="game.js?v=3.1.2"></script>
+  <script src="game.js?v=3.2.0"></script>
 </body>
 </html>
